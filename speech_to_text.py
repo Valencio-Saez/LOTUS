@@ -3,7 +3,6 @@ import speech_recognition as sr
 import keyboard  # To detect spacebar press
 from pydub import AudioSegment
 
-
 def prepare_voice_file(path: str) -> str:
     """
     Converts the input audio file to WAV format if necessary and returns the path to the WAV file.
@@ -16,61 +15,58 @@ def prepare_voice_file(path: str) -> str:
         audio_file.export(wav_file, format='wav')
         return wav_file
     else:
-        raise ValueError(f'Unsupported audio format: {format(os.path.splitext(path)[1])}')
-
+        raise ValueError(f'Unsupported audio format: {os.path.splitext(path)[1]}')
 
 def transcribe_audio(audio_data, language) -> str:
     """
     Transcribes audio data to text using Google's speech recognition API.
     """
     r = sr.Recognizer()
-    text = r.recognize_google(audio_data, language=language)
-    return text
-
+    try:
+        text = r.recognize_google(audio_data, language=language)
+        return text
+    except sr.UnknownValueError:
+        return "[Unrecognized Speech]"
+    except sr.RequestError:
+        return "[Speech Recognition Service Unavailable]"
 
 def write_transcription_to_file(text, output_file) -> None:
     """
-    Writes the transcribed text to the output file.
+    Appends the transcribed text to the output file.
     """
-    with open(output_file, 'w') as f:
-        f.write(text)
+    with open(output_file, 'a') as f:
+        f.write(text + '\n')
 
-
-def speech_to_text(language: str = "en-US") -> None:
+def continuous_speech_to_text(language: str = "en-US", output_file: str = "output.txt") -> None:
     """
-    Transcribes the audio to text and writes the text to a file.
-    Starts recording when spacebar is pressed, and stops when spacebar is pressed again.
+    Continuously records speech and transcribes it every few seconds.
+    Stops when the spacebar is pressed again.
     """
     r = sr.Recognizer()
-    
     recording = False
     with sr.Microphone() as source:
-
         print("LOTUS: SPEECH TO TEXT APPLICATION")
-
         print("Ambient noise detected. Adjustments complete. Ready to record!")
-        
         print("\nPress spacebar to start recording. Press it again to stop.")
 
         r.adjust_for_ambient_noise(source)  # Adjusting for ambient noise
         
-        # Wait until spacebar is pressed to start recording
         while True:
-            if keyboard.is_pressed('space'):  # Wait for spacebar press
+            if keyboard.is_pressed('space'):
                 if not recording:
-                    print("Recording started...")
+                    print("Recording started... Speak now!")
                     recording = True
-                    print("Recording... Speak now!")
-                    audio_data = r.listen(source, timeout=20, phrase_time_limit=10)  # Start recording
-                    print("Recording stopped.")
-                    text = transcribe_audio(audio_data, language)  # Transcribe audio to text
-                    print("Transcription:", text)
-                    write_transcription_to_file(text, "output.txt")  # Save to file
-                    break  # Break out of loop after one recording
                 else:
                     print("Recording stopped.")
-                    break  # Stop recording when space is pressed again
+                    break
             
+            try:
+                audio_data = r.listen(source, timeout=10, phrase_time_limit=5)  # Capture short clips
+                text = transcribe_audio(audio_data, language)
+                print("Transcription:", text)
+                write_transcription_to_file(text, output_file)  # Append transcription
+            except sr.WaitTimeoutError:
+                continue  # No speech detected, continue listening
 
 if __name__ == '__main__':
-    speech_to_text()  # Start the process with the default language ("en-US")
+    continuous_speech_to_text()
