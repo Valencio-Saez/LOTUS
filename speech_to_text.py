@@ -1,6 +1,9 @@
+from tkinter import filedialog, scrolledtext
+import tkinter as tk
 import os
 import speech_recognition as sr
 from pydub import AudioSegment
+from GUI import GUI
 
 
 def prepare_voice_file(path: str) -> str:
@@ -51,18 +54,22 @@ def speech_to_text(input_path: str, output_path: str, language: str) -> None:
 
 
 if __name__ == '__main__':
-    print('Please enter the path to an audio file (WAV, MP3, M4A, OGG, or FLAC):')
-    input_path = input().strip()
-    if not os.path.isfile(input_path):
-        print('Error: File not found.')
-        exit(1)
-    else:
-        print('Please enter the path to the output file:')
-        output_path = input().strip()
-        print('Please enter the language code (e.g. en-US):')
-        language = input().strip()
-        try:
-            speech_to_text(input_path, output_path, language)
-        except Exception as e:
-            print('Error:', e)
-            exit(1)
+    window = tk.Tk()
+    gui = GUI(window)
+    window.mainloop()
+
+    # print('Please enter the path to an audio file (WAV, MP3, M4A, OGG, or FLAC):')
+    # input_path = input().strip()
+    # if not os.path.isfile(input_path):
+    #     print('Error: File not found.')
+    #     exit(1)
+    # else:
+    #     print('Please enter the path to the output file:')
+    #     output_path = input().strip()
+    #     print('Please enter the language code (e.g. en-US):')
+    #     language = input().strip()
+    #     try:
+    #         speech_to_text(input_path, output_path, language)
+    #     except Exception as e:
+    #         print('Error:', e)
+    #         exit(1)
