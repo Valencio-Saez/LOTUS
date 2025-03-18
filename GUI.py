@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import filedialog, scrolledtext
 import os
+from speech_to_text import SpeechRec
 
 
 class GUI:
@@ -52,7 +53,7 @@ class GUI:
         file_path = filedialog.askopenfilename(initialdir=initial_dir)
         if file_path:
             if hidden:
-                self.hidden_button_action(file_path)
+                self.read_text(file_path)
             else:
                 self.read_wav(file_path)
         else:
@@ -60,15 +61,14 @@ class GUI:
 
     def read_wav(self, file_path):
         if os.path.splitext(file_path)[1].lower() == '.wav':
-            with open(file_path, 'r') as file:
-                content = file.read()
+            content = SpeechRec.speech_to_text(file_path, "output1.txt", "EN")
             self.display_text(content)
         else:
             self.display_text("Invalid File: Please select a .wav file.")
             self.text_box.tag_add("error", "1.0", "end")
             self.text_box.tag_config("error", foreground="red")
 
-    def hidden_button_action(self, file_path):
+    def read_text(self, file_path):
         with open(file_path, 'r') as file:
             content = file.read()
         self.display_text(content)
