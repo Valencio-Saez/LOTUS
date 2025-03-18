@@ -76,7 +76,7 @@ class GUI:
     def display_text(self, content):
         self.text_box.delete(1.0, tk.END)
         words = content.split()
-        line = ""
+        line = "Transcription:\n"
         for word in words:
             if len(line) + len(word) + 1 > 75:
                 self.text_box.insert(tk.END, line + '\n')

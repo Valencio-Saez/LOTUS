@@ -44,7 +44,6 @@ class SpeechRec:
             audio_data = sr.Recognizer().record(source)
             text = SpeechRec.transcribe_audio(audio_data, language)
             SpeechRec.write_transcription_to_file(text, output_path)
-            text = 'Transcription:\n' + text
             return text
 
 
