@@ -6,6 +6,7 @@ import speech_recognition as sr
 from speech_to_text import SpeechRec
 from offline_speech_recognition import OfflineSpeechRecognition
 import socket
+import keyboard
 
 # Function to check for internet connection
 
@@ -80,7 +81,7 @@ class SpeechRecognitionApp:
     def display_text(self, content):
         self.text_box.delete(1.0, tk.END)
         words = content.split()
-        line = ""
+        line = "Transcription complete:\n"
         for word in words:
             if len(line) + len(word) + 1 > 75:
                 self.text_box.insert(tk.END, line + '\n')
@@ -95,10 +96,9 @@ class SpeechRecognitionApp:
 
     def read_wav(self, file_path):
         try:
-            wav_file = SpeechRec.prepare_voice_file(file_path)
+            # wav_file = SpeechRec.prepare_voice_file(file_path)
             if check_internet_connection():
-                text = SpeechRec.speech_to_text(
-                    wav_file, "output.txt", "en-US")
+                text = SpeechRec().transcribe_audio_file(file_path, "output.txt")
             else:
                 # Initialize offline recognizer
                 self.offline_recognizer = OfflineSpeechRecognition(
@@ -107,7 +107,7 @@ class SpeechRecognitionApp:
                     wav_file)
                 text = self.offline_recognizer.transcribe_audio_file(
                     converted_path)
-            self.display_text(f"Transcription:\n{text}")
+            self.display_text(text)
         except Exception as e:
             self.display_text(f"Error processing WAV file: {e}")
 
@@ -119,14 +119,41 @@ class SpeechRecognitionApp:
         except Exception as e:
             self.display_text(f"Error reading text file: {e}")
 
-    def use_live_audio(self):
+    def use_live_audio(self, lang="en-US", output_file="live_output.txt"):
         self.display_text("Using live audio")
+        Speech_rec = SpeechRec()
+        recognizer = sr.Recognizer()
+        # while True:
+        #     self.display_text(SpeechRec().record_live_audio_and_transcribe())
+
+        while not keyboard.is_pressed('space'):
+            pass  # Wait for the spacebar to start recording
+
+        print("Recording started... Speak now! Press spacebar to stop.")
+
+        with sr.Microphone() as source:
+            recognizer.adjust_for_ambient_noise(source)
+            try:
+                # while True:
+                #     if keyboard.is_pressed('space'):
+                #         print("Recording stopped.")
+                #         break
+                audio_data = recognizer.listen(
+                    source, timeout=10, phrase_time_limit=5)
+                transcription = Speech_rec.get_transcription_from_audio(
+                    audio_data, lang)
+                Speech_rec.append_transcription_to_file(
+                    transcription, output_file)
+                self.display_text(transcription)
+            except sr.WaitTimeoutError:
+                pass
 
     def quit_app(self):
         self.root.quit()
 
 
-# Run the application
-root = tk.Tk()
-app = SpeechRecognitionApp(root)
-root.mainloop()
+if __name__ == "__main__":
+    # Run the application
+    root = tk.Tk()
+    app = SpeechRecognitionApp(root)
+    root.mainloop()
