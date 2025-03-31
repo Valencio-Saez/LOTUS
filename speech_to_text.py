@@ -4,9 +4,6 @@ import keyboard  # To detect spacebar press
 from pydub import AudioSegment
 
 def prepare_voice_file(path: str) -> str:
-    """
-    Converts the input audio file to WAV format if necessary and returns the path to the WAV file.
-    """
     if os.path.splitext(path)[1] == '.wav':
         return path
     elif os.path.splitext(path)[1] in ('.mp3', '.m4a', '.ogg', '.flac'):
@@ -17,10 +14,7 @@ def prepare_voice_file(path: str) -> str:
     else:
         raise ValueError(f'Unsupported audio format: {os.path.splitext(path)[1]}')
 
-def transcribe_audio(audio_data, language) -> str:
-    """
-    Transcribes audio data to text using Google's speech recognition API.
-    """
+def transcribe_audio(audio_data, language="en-US") -> str:
     r = sr.Recognizer()
     try:
         text = r.recognize_google(audio_data, language=language)
@@ -31,42 +25,71 @@ def transcribe_audio(audio_data, language) -> str:
         return "[Speech Recognition Service Unavailable]"
 
 def write_transcription_to_file(text, output_file) -> None:
-    """
-    Appends the transcribed text to the output file.
-    """
     with open(output_file, 'a') as f:
         f.write(text + '\n')
 
-def continuous_speech_to_text(language: str = "en-US", output_file: str = "output.txt") -> None:
-    """
-    Continuously records speech and transcribes it every few seconds.
-    Stops when the spacebar is pressed again.
-    """
-    r = sr.Recognizer()
-    recording = False
-    with sr.Microphone() as source:
-        print("LOTUS: SPEECH TO TEXT APPLICATION")
-        print("Ambient noise detected. Adjustments complete. Ready to record!")
-        print("\nPress spacebar to start recording. Press it again to stop.")
+def speech_to_text(input_path: str, output_path: str, language="en-US") -> None:
+    wav_file = prepare_voice_file(input_path)
+    with sr.AudioFile(wav_file) as source:
+        audio_data = sr.Recognizer().record(source)
+        text = transcribe_audio(audio_data, language)
+        write_transcription_to_file(text, output_path)
+        print('Transcription:')
+        print(text)
 
-        r.adjust_for_ambient_noise(source)  # Adjusting for ambient noise
-        
-        while True:
-            if keyboard.is_pressed('space'):
-                if not recording:
-                    print("Recording started... Speak now!")
-                    recording = True
-                else:
+def continuous_speech_to_text(language="en-US", output_file="live_output.txt") -> None:
+    r = sr.Recognizer()
+    print("LOTUS: SPEECH TO TEXT APPLICATION")
+    print("\nPress spacebar to start recording.")
+    
+    while not keyboard.is_pressed('space'):
+        pass  # Wait for the user to press spacebar to start
+    
+    print("Recording started... Speak now! Press spacebar again to stop.")
+    
+    with sr.Microphone() as source:
+        r.adjust_for_ambient_noise(source)
+        try:
+            while True:
+                if keyboard.is_pressed('space'):
                     print("Recording stopped.")
                     break
-            
-            try:
-                audio_data = r.listen(source, timeout=10, phrase_time_limit=5)  # Capture short clips
+                audio_data = r.listen(source, timeout=10, phrase_time_limit=5)
                 text = transcribe_audio(audio_data, language)
                 print("Transcription:", text)
-                write_transcription_to_file(text, output_file)  # Append transcription
-            except sr.WaitTimeoutError:
-                continue  # No speech detected, continue listening
+                write_transcription_to_file(text, output_file)
+        except sr.WaitTimeoutError:
+            pass
+
+def clear_screen():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def main_menu():
+    while True:
+        clear_screen()
+        print("\nSelect an option:")
+        print("1. Convert Audio File to Text")
+        print("2. Convert Live Recording to Text")
+        
+        choice = input("Enter your choice (1 or 2): ").strip()
+        
+        if choice == "1":
+            print("Please enter the path to an audio file (WAV, MP3, M4A, OGG, or FLAC):")
+            input_path = input().strip()
+            if not os.path.isfile(input_path):
+                print("Error: File not found.")
+            else:
+                print("Please enter the path to the output file:")
+                output_path = input().strip()
+                try:
+                    speech_to_text(input_path, output_path)
+                except Exception as e:
+                    print("Error:", e)
+        elif choice == "2":
+            print("Starting live recording... Press spacebar to start and stop.")
+            continuous_speech_to_text()
+        else:
+            print("Invalid choice. Please enter 1 or 2.")
 
 if __name__ == '__main__':
-    continuous_speech_to_text()
+    main_menu()
