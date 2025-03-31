@@ -1,5 +1,6 @@
 import os
 import speech_recognition as sr
+import keyboard
 from pydub import AudioSegment
 
 
