@@ -52,7 +52,7 @@ class SpeechRecognitionApp:
 
         # Initialize offline recognizer
         self.offline_recognizer = OfflineSpeechRecognition(
-            r"C:\Users\Frank\github lotus\LOTUS\LOTUS\vosk-model-en-us-0.42-gigaspeech\vosk-model-en-us-0.42-gigaspeech")
+            r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
 
         # Add a Text widget for transcription display
         self.text_box = tk.Text(root, width=70, height=6.5, wrap=tk.WORD)

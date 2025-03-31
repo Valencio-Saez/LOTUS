@@ -38,7 +38,7 @@ class OfflineSpeechRecognition:
 
 
 if __name__ == '__main__':
-    MODEL_PATH = r"C:\Users\Frank\github lotus\LOTUS\LOTUS\vosk-model-en-us-0.42-gigaspeech\vosk-model-en-us-0.42-gigaspeech"
+    MODEL_PATH = r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech"
     recognizer = OfflineSpeechRecognition(MODEL_PATH)
 
     print('Enter the path to an audio file:')
