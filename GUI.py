@@ -50,10 +50,6 @@ class SpeechRecognitionApp:
         self.canvas.create_window(165, 235, window=self.btn_live)
         self.canvas.create_window(165, 321, window=self.btn_quit)
 
-        # Initialize offline recognizer
-        self.offline_recognizer = OfflineSpeechRecognition(
-            r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
-
         # Add a Text widget for transcription display
         self.text_box = tk.Text(root, width=70, height=6.5, wrap=tk.WORD)
 
@@ -104,6 +100,9 @@ class SpeechRecognitionApp:
                 text = SpeechRec.speech_to_text(
                     wav_file, "output.txt", "en-US")
             else:
+                # Initialize offline recognizer
+                self.offline_recognizer = OfflineSpeechRecognition(
+                    r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
                 converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(
                     wav_file)
                 text = self.offline_recognizer.transcribe_audio_file(
