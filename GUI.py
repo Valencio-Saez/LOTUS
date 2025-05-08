@@ -7,6 +7,8 @@ from speech_to_text import SpeechRec
 from offline_speech_recognition import OfflineSpeechRecognition
 import socket
 import keyboard
+import webrtcvad
+import collections
 
 # Function to check for internet connection
 
