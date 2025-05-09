@@ -120,33 +120,41 @@ class SpeechRecognitionApp:
             self.display_text(f"Error reading text file: {e}")
 
     def use_live_audio(self, lang="en-US", output_file="live_output.txt"):
-        self.display_text("Using live audio")
-        Speech_rec = SpeechRec()
         recognizer = sr.Recognizer()
-        # while True:
-        #     self.display_text(SpeechRec().record_live_audio_and_transcribe())
-
-        while not keyboard.is_pressed('space'):
-            pass  # Wait for the spacebar to start recording
-
-        print("Recording started... Speak now! Press spacebar to stop.")
+        self.display_text("Recording started... Speak now!")
 
         with sr.Microphone() as source:
             recognizer.adjust_for_ambient_noise(source)
+            self.display_text("Listening...")
+
             try:
-                # while True:
-                #     if keyboard.is_pressed('space'):
-                #         print("Recording stopped.")
-                #         break
-                audio_data = recognizer.listen(
-                    source, timeout=10, phrase_time_limit=5)
-                transcription = Speech_rec.get_transcription_from_audio(
-                    audio_data, lang)
-                Speech_rec.append_transcription_to_file(
-                    transcription, output_file)
-                self.display_text(transcription)
-            except sr.WaitTimeoutError:
-                pass
+                audio_data = recognizer.listen(source, timeout=None, phrase_time_limit=None)
+                self.display_text("Recording stopped. Saving audio...")
+
+                # Save the audio data to a WAV file
+                audio_file_path = "live_recording.wav"
+                with open(audio_file_path, "wb") as audio_file:
+                    audio_file.write(audio_data.get_wav_data())
+
+                self.display_text("Audio saved. Processing transcription...")
+
+                # Transcribe the saved audio file
+                if check_internet_connection():
+                    text = SpeechRec().transcribe_audio_file(audio_file_path, output_file)
+                else:
+                    # Initialize offline recognizer
+                    self.offline_recognizer = OfflineSpeechRecognition(
+                        r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
+                    converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(audio_file_path)
+                    text = self.offline_recognizer.transcribe_audio_file(converted_path)
+
+                self.display_text(f"Live Transcription:\n{text}")
+
+                # Save transcription to a file
+                with open(output_file, 'w') as file:
+                    file.write(text)
+            except Exception as e:
+                self.display_text(f"Error during live transcription: {e}")
 
     def quit_app(self):
         self.root.quit()
