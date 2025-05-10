@@ -9,6 +9,9 @@ import socket
 import keyboard
 import webrtcvad
 import collections
+import wave
+import pyaudio
+import numpy as np
 
 # Function to check for internet connection
 
@@ -123,6 +126,52 @@ class SpeechRecognitionApp:
 
     def use_live_audio(self, lang="en-US", output_file="live_output.txt"):
         self.display_text("Using live audio")
+        # 0 -3 more aggrassive is more filtering of none speech
+        vad = webrtcvad.Vad(2)
+        format = pyaudio.paInt16
+        channels = 1
+        rate = 16000
+        frame_duration = 30  # ms
+        frame_size = int(rate * frame_duration / 1000)
+        buffer_size = 10  # number of frames to collect
+        pa = pyaudio.PyAudio()
+        stream = pa.open(format=format,
+                         channels=channels,
+                         rate=rate,
+                         input=True,
+                         frames_per_buffer=frame_size)
+
+        ring_buffer = collections.deque(maxlen=buffer_size)
+        triggered = False
+        voiced_frames = []
+
+        try:
+            while True:
+                frame = stream.read(frame_size, exception_on_overflow = False)
+                is_speech = vad.is_speech(frame, rate)
+
+                if not triggered:
+                    ring_buffer.append((frame, is_speech))
+                    num_voiced = len([f for f, speech in ring_buffer if speech])
+                    if num_voiced > 0.8 * ring_buffer.maxlen:
+                        triggered = True
+                        self.display_text("Recording")
+                        for f, s in ring_buffer:
+                            voiced_frames.append(f)
+                        ring_buffer.clear()
+                else:
+                    voiced_frames.append(frame)
+                    ring_buffer.append((frame, is_speech))
+                    num_unvoiced = len([f for f, speech in ring_buffer if not speech])
+                    if num_unvoiced > 0.8 * ring_buffer.maxlen:
+                        self.display_text("Stopped recording")
+                        break
+        finally:
+            stream.stop_stream()
+            stream.close()
+            pa.terminate()
+        
+        
         Speech_rec = SpeechRec()
         recognizer = sr.Recognizer()
         # while True:
