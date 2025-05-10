@@ -7,6 +7,9 @@ from speech_to_text import SpeechRec
 from offline_speech_recognition import OfflineSpeechRecognition
 import socket
 import keyboard
+import vosk
+import pyaudio
+import json
 
 # Function to check for internet connection
 
@@ -96,7 +99,7 @@ class SpeechRecognitionApp:
 
     def read_wav(self, file_path):
         try:
-            # wav_file = SpeechRec.prepare_voice_file(file_path)
+            wav_file = SpeechRec.prepare_voice_file(file_path)
             if check_internet_connection():
                 text = SpeechRec().transcribe_audio_file(file_path, "output.txt")
             else:
@@ -120,6 +123,7 @@ class SpeechRecognitionApp:
             self.display_text(f"Error reading text file: {e}")
 
     def use_live_audio(self, lang="en-US", output_file="live_output.txt"):
+        
         self.display_text("Using live audio")
         Speech_rec = SpeechRec()
         recognizer = sr.Recognizer()
