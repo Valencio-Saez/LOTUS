@@ -101,7 +101,7 @@ class SpeechRecognitionApp:
 
     def read_wav(self, file_path):
         try:
-            # wav_file = SpeechRec.prepare_voice_file(file_path)
+            wav_file = SpeechRec.prepare_voice_file(file_path)
             if check_internet_connection():
                 text = SpeechRec().transcribe_audio_file(file_path, "output.txt")
             else:
@@ -147,12 +147,13 @@ class SpeechRecognitionApp:
 
         try:
             while True:
-                frame = stream.read(frame_size, exception_on_overflow = False)
+                frame = stream.read(frame_size, exception_on_overflow=False)
                 is_speech = vad.is_speech(frame, rate)
 
                 if not triggered:
                     ring_buffer.append((frame, is_speech))
-                    num_voiced = len([f for f, speech in ring_buffer if speech])
+                    num_voiced = len(
+                        [f for f, speech in ring_buffer if speech])
                     if num_voiced > 0.8 * ring_buffer.maxlen:
                         triggered = True
                         self.display_text("Recording")
@@ -162,7 +163,8 @@ class SpeechRecognitionApp:
                 else:
                     voiced_frames.append(frame)
                     ring_buffer.append((frame, is_speech))
-                    num_unvoiced = len([f for f, speech in ring_buffer if not speech])
+                    num_unvoiced = len(
+                        [f for f, speech in ring_buffer if not speech])
                     if num_unvoiced > 0.8 * ring_buffer.maxlen:
                         self.display_text("Stopped recording")
                         break
@@ -170,34 +172,46 @@ class SpeechRecognitionApp:
             stream.stop_stream()
             stream.close()
             pa.terminate()
+
+        temp_wav_path = "temp_vad_output.wav"
+        with wave.open(temp_wav_path, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(pa.get_sample_size(format))
+            wf.setframerate(rate)
+            wf.writeframes(b''.join(voiced_frames))
         
-        
-        Speech_rec = SpeechRec()
-        recognizer = sr.Recognizer()
-        # while True:
-        #     self.display_text(SpeechRec().record_live_audio_and_transcribe())
+        try:
+            Speech_rec = SpeechRec()
+            transcription = Speech_rec.transcribe_audio_file(temp_wav_path)
+            Speech_rec.append_transcription_to_file(transcription, output_file)
+            self.display_text(transcription)
+        except Exception as e:
+            self.display_text(f"Error transcribing audio {e}")
+        # recognizer = sr.Recognizer()
+        # # while True:
+        # #     self.display_text(SpeechRec().record_live_audio_and_transcribe())
 
-        while not keyboard.is_pressed('space'):
-            pass  # Wait for the spacebar to start recording
+        # while not keyboard.is_pressed('space'):
+        #     pass  # Wait for the spacebar to start recording
 
-        print("Recording started... Speak now! Press spacebar to stop.")
+        # print("Recording started... Speak now! Press spacebar to stop.")
 
-        with sr.Microphone() as source:
-            recognizer.adjust_for_ambient_noise(source)
-            try:
-                # while True:
-                #     if keyboard.is_pressed('space'):
-                #         print("Recording stopped.")
-                #         break
-                audio_data = recognizer.listen(
-                    source, timeout=10, phrase_time_limit=5)
-                transcription = Speech_rec.get_transcription_from_audio(
-                    audio_data, lang)
-                Speech_rec.append_transcription_to_file(
-                    transcription, output_file)
-                self.display_text(transcription)
-            except sr.WaitTimeoutError:
-                pass
+        # with sr.Microphone() as source:
+        #     recognizer.adjust_for_ambient_noise(source)
+        #     try:
+        #         # while True:
+        #         #     if keyboard.is_pressed('space'):
+        #         #         print("Recording stopped.")
+        #         #         break
+        #         audio_data = recognizer.listen(
+        #             source, timeout=10, phrase_time_limit=5)
+        #         transcription = Speech_rec.get_transcription_from_audio(
+        #             audio_data, lang)
+        #         Speech_rec.append_transcription_to_file(
+        #             transcription, output_file)
+        #         self.display_text(transcription)
+        #     except sr.WaitTimeoutError:
+        #         pass
 
     def quit_app(self):
         self.root.quit()
