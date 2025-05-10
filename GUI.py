@@ -127,7 +127,7 @@ class SpeechRecognitionApp:
     def use_live_audio(self, lang="en-US", output_file="live_output.txt"):
         self.display_text("Using live audio")
         # 0 -3 more aggrassive is more filtering of none speech
-        vad = webrtcvad.Vad(2)
+        vad = webrtcvad.Vad(1)
         format = pyaudio.paInt16
         channels = 1
         rate = 16000
@@ -179,10 +179,11 @@ class SpeechRecognitionApp:
             wf.setsampwidth(pa.get_sample_size(format))
             wf.setframerate(rate)
             wf.writeframes(b''.join(voiced_frames))
-        
+
         try:
             Speech_rec = SpeechRec()
-            transcription = Speech_rec.transcribe_audio_file(temp_wav_path)
+            transcription = Speech_rec.transcribe_audio_file(
+                temp_wav_path, output_file)
             Speech_rec.append_transcription_to_file(transcription, output_file)
             self.display_text(transcription)
         except Exception as e:
