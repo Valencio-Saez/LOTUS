@@ -6,12 +6,10 @@ import speech_recognition as sr
 from speech_to_text import SpeechRec
 from offline_speech_recognition import OfflineSpeechRecognition
 import socket
-import keyboard
 import webrtcvad
 import collections
 import wave
 import pyaudio
-import numpy as np
 
 # Function to check for internet connection
 
