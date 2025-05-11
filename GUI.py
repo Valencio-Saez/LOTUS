@@ -7,6 +7,7 @@ from speech_to_text import SpeechRec
 from offline_speech_recognition import OfflineSpeechRecognition
 import socket
 import keyboard
+import threading
 
 # Function to check for internet connection
 
@@ -120,41 +121,59 @@ class SpeechRecognitionApp:
             self.display_text(f"Error reading text file: {e}")
 
     def use_live_audio(self, lang="en-US", output_file="live_output.txt"):
+        if hasattr(self, 'is_recording') and self.is_recording:
+            # Stop recording
+            self.is_recording = False
+            self.display_text("Recording stopped.")
+            return
+
+        # Start recording
+        self.is_recording = True
         recognizer = sr.Recognizer()
         self.display_text("Recording started... Speak now!")
 
-        with sr.Microphone() as source:
-            recognizer.adjust_for_ambient_noise(source)
-            self.display_text("Listening...")
+        def record_audio():
+            with sr.Microphone() as source:
+                recognizer.adjust_for_ambient_noise(source)
+                self.display_text("Listening...")
 
-            try:
-                audio_data = recognizer.listen(source, timeout=None, phrase_time_limit=None)
-                self.display_text("Recording stopped. Saving audio...")
+                try:
+                    while self.is_recording:
+                        audio_data = recognizer.listen(source, timeout=None, phrase_time_limit=None)
+                        self.display_text("Processing audio...")
 
-                # Save the audio data to a WAV file
-                audio_file_path = "live_recording.wav"
-                with open(audio_file_path, "wb") as audio_file:
-                    audio_file.write(audio_data.get_wav_data())
+                        # Save the audio data to a WAV file
+                        audio_file_path = "live_recording.wav"
+                        with open(audio_file_path, "wb") as audio_file:
+                            audio_file.write(audio_data.get_wav_data())
 
-                self.display_text("Audio saved. Processing transcription...")
+                        self.display_text("Audio saved. Processing transcription...")
 
-                # Transcribe the saved audio file
-                if check_internet_connection():
-                    text = SpeechRec().transcribe_audio_file(audio_file_path, output_file)
-                else:
-                    # Initialize offline recognizer
-                    self.offline_recognizer = OfflineSpeechRecognition(
-                        r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
-                    converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(audio_file_path)
-                    text = self.offline_recognizer.transcribe_audio_file(converted_path)
+                        # Transcribe the saved audio file
+                        if check_internet_connection():
+                            text = SpeechRec().transcribe_audio_file(audio_file_path, output_file)
+                        else:
+                            # Initialize offline recognizer
+                            self.offline_recognizer = OfflineSpeechRecognition(
+                                r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
+                            converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(audio_file_path)
+                            text = self.offline_recognizer.transcribe_audio_file(converted_path)
 
-                self.display_text(f"Live Transcription:\n{text}")
+                        self.display_text(f"Live Transcription:\n{text}")
 
-                # Save transcription to a file
-                with open(output_file, 'w') as file:
-                    file.write(text)
-            except Exception as e:
-                self.display_text(f"Error during live transcription: {e}")
+                        # Save transcription to a file
+                        with open(output_file, 'w') as file:
+                            file.write(text)
+                except sr.WaitTimeoutError:
+                    # Continue listening if no speech is detected
+                    self.display_text("No speech detected, still listening...")
+                except Exception as e:
+                    self.display_text(f"Error during live transcription: {e}")
+                    
+                    
+
+        # Run the recording in a separate thread to avoid blocking the UI
+        threading.Thread(target=record_audio, daemon=True).start()
 
     def quit_app(self):
         self.root.quit()
