@@ -1,4 +1,5 @@
 import tkinter as tk
+import threading
 from tkinter import filedialog
 from PIL import Image, ImageTk
 import os
@@ -123,34 +124,96 @@ class SpeechRecognitionApp:
             self.display_text(f"Error reading text file: {e}")
 
     def use_live_audio(self, lang="en-US", output_file="live_output.txt"):
-        
-        self.display_text("Using live audio")
-        Speech_rec = SpeechRec()
-        recognizer = sr.Recognizer()
-        # while True:
-        #     self.display_text(SpeechRec().record_live_audio_and_transcribe())
+        self.display_text("Starting model, please wait.")
+        threading.Thread(target=self.run_live_audio, args=(
+            lang, output_file), daemon=True).start()
 
-        while not keyboard.is_pressed('space'):
-            pass  # Wait for the spacebar to start recording
+    def run_live_audio(self, lang="en-US", output_file="live_output.txt"):
+        model_path = os.path.join(os.path.dirname(
+            __file__), "vosk-model-en-us-0.22")
 
-        print("Recording started... Speak now! Press spacebar to stop.")
+        if not os.path.exists(model_path):
+            self.display_text(f"Model not found at {model_path}")
+            return
 
-        with sr.Microphone() as source:
-            recognizer.adjust_for_ambient_noise(source)
-            try:
-                # while True:
-                #     if keyboard.is_pressed('space'):
-                #         print("Recording stopped.")
-                #         break
-                audio_data = recognizer.listen(
-                    source, timeout=10, phrase_time_limit=5)
-                transcription = Speech_rec.get_transcription_from_audio(
-                    audio_data, lang)
-                Speech_rec.append_transcription_to_file(
-                    transcription, output_file)
-                self.display_text(transcription)
-            except sr.WaitTimeoutError:
-                pass
+        model = vosk.Model(model_path)
+        recognizer = vosk.KaldiRecognizer(model, 16000)
+
+        pa = pyaudio.PyAudio()
+        stream = pa.open(format=pyaudio.paInt16,
+                         channels=1,
+                         rate=16000,
+                         input=True,
+                         frames_per_buffer=8000)
+        stream.start_stream()
+
+        final_transcription = ""
+
+        try:
+            while True:
+                if keyboard.is_pressed('esc'):
+                    self.display_text("Recording stopped.")
+                    break
+
+                data = stream.read(4000, exception_on_overflow=False)
+                if recognizer.AcceptWaveform(data):
+                    result = json.loads(recognizer.Result())
+                    if result.get("text"):
+                        final_transcription += result["text"] + ""
+                        self.text_box.delete(1.0, tk.END)
+                        self.text_box.insert(
+                            tk.END, final_transcription.strip())
+                    else:
+                        partial_result = json.loads(recognizer.PartialResult())
+                        partial = partial_result.get("partial", "")
+                        if partial:
+                            self.text_box.delete(1.0, tk.END)
+                            self.text_box.insert(
+                                tk.END, final_transcription + "\n" + partial)
+        except Exception as e:
+            self.display_text(f"Error: {e}")
+
+        finally:
+            stream.stop_stream()
+            stream.close()
+            pa.terminate()
+
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(final_transcription.strip())
+
+        # Speech_rec = SpeechRec()
+        # recognizer = sr.Recognizer()
+        # # while True:
+        # #     self.display_text(SpeechRec().record_live_audio_and_transcribe())
+
+        # while not keyboard.is_pressed('space'):
+        #     pass  # Wait for the spacebar to start recording
+
+        # print("Recording started... Speak now! Press spacebar to stop.")
+
+        # with sr.Microphone() as source:
+        #     recognizer.adjust_for_ambient_noise(source)
+        #     try:
+        #         # while True:
+        #         #     if keyboard.is_pressed('space'):
+        #         #         print("Recording stopped.")
+        #         #         break
+        #         audio_data = recognizer.listen(
+        #             source, timeout=10, phrase_time_limit=5)
+        #         transcription = Speech_rec.get_transcription_from_audio(
+        #             audio_data, lang)
+        #         Speech_rec.append_transcription_to_file(
+        #             transcription, output_file)
+        #         self.display_text(transcription)
+        #     except sr.WaitTimeoutError:
+        #         pass
+
+    def _safe_dislay(self, content):
+        self.text_box.after(0, lambda: self._update_text_box(content))
+
+    def _update_text_box(self, content):
+        self.text_box.delete(1.0, tk.END)
+        self.text_box.insert(tk.END, content)
 
     def quit_app(self):
         self.root.quit()
