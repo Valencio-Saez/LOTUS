@@ -159,17 +159,20 @@ class SpeechRecognitionApp:
                 if recognizer.AcceptWaveform(data):
                     result = json.loads(recognizer.Result())
                     if result.get("text"):
-                        final_transcription += result["text"] + ""
+                        final_transcription += result["text"] + " "
+                        # Show the full transcription so far
                         self.text_box.delete(1.0, tk.END)
                         self.text_box.insert(
                             tk.END, final_transcription.strip())
-                    else:
-                        partial_result = json.loads(recognizer.PartialResult())
-                        partial = partial_result.get("partial", "")
-                        if partial:
-                            self.text_box.delete(1.0, tk.END)
-                            self.text_box.insert(
-                                tk.END, final_transcription + "\n" + partial)
+                else:
+                    # Show partial (live) result
+                    partial_result = json.loads(recognizer.PartialResult())
+                    partial = partial_result.get("partial", "")
+                    if partial:
+                        self.text_box.delete(1.0, tk.END)
+                        self.text_box.insert(
+                            tk.END, final_transcription + partial)
+
         except Exception as e:
             self.display_text(f"Error: {e}")
 
