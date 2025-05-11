@@ -125,93 +125,80 @@ class SpeechRecognitionApp:
 
     def use_live_audio(self, lang="en-US", output_file="live_output.txt"):
         self.display_text("Starting model, please wait.")
-        threading.Thread(target=self.run_live_audio, args=(
-            lang, output_file), daemon=True).start()
+
+        # Start the live recording process tin a separate thread to prevent the UI from freezing
+        threading.Thread(
+            target=self.run_live_audio,   # Function to run in the background
+            args=(lang, output_file),     # Arguments passed to the function
+            daemon=True                   # Daemon thread will close when the app exits
+        ).start()
 
     def run_live_audio(self, lang="en-US", output_file="live_output.txt"):
+        # Path to vosk model
         model_path = os.path.join(os.path.dirname(
             __file__), "vosk-model-en-us-0.22")
 
+        # If model does not exist show error and stop
         if not os.path.exists(model_path):
             self.display_text(f"Model not found at {model_path}")
             return
 
+        # Load the vosk model
         model = vosk.Model(model_path)
+        # Create a recognizer with a sample rate of 16kHz (standard for speech)
         recognizer = vosk.KaldiRecognizer(model, 16000)
 
+        # Initialize PyAudio for audio capture from the microphone
         pa = pyaudio.PyAudio()
-        stream = pa.open(format=pyaudio.paInt16,
-                         channels=1,
-                         rate=16000,
-                         input=True,
-                         frames_per_buffer=8000)
-        stream.start_stream()
+        stream = pa.open(format=pyaudio.paInt16,  # 16 bit audio
+                         channels=1,  # Mono input
+                         rate=16000,                # Sample rate must match recognizer rate
+                         input=True,                # Enable input from the microphone
+                         frames_per_buffer=8000)  # Size of the audio buffer
+        stream.start_stream()  # Start capturing audio
 
-        final_transcription = ""
+        final_transcription = ""  # String to store the complete transcription
 
         try:
             while True:
+                # Break loop if esc is pressed
                 if keyboard.is_pressed('esc'):
-                    self.display_text("Recording stopped.")
+                    self._safe_display("Recording stopped.")
                     break
-
+                # Read audio data from stream
                 data = stream.read(4000, exception_on_overflow=False)
+
+                # If a complete phrase is detected
                 if recognizer.AcceptWaveform(data):
                     result = json.loads(recognizer.Result())
                     if result.get("text"):
+                        # Show full transcription so far
                         final_transcription += result["text"] + " "
-                        # Show the full transcription so far
-                        self.text_box.delete(1.0, tk.END)
-                        self.text_box.insert(
-                            tk.END, final_transcription.strip())
+                        self._safe_display(final_transcription.strip())
                 else:
                     # Show partial (live) result
                     partial_result = json.loads(recognizer.PartialResult())
                     partial = partial_result.get("partial", "")
                     if partial:
-                        self.text_box.delete(1.0, tk.END)
-                        self.text_box.insert(
-                            tk.END, final_transcription + partial)
+                        self._safe_display(final_transcription + partial)
 
         except Exception as e:
-            self.display_text(f"Error: {e}")
+            # Show any unexpected errors
+            self._safe_display(f"Error: {e}")
 
         finally:
+            # Stop and close the audio stream
             stream.stop_stream()
             stream.close()
             pa.terminate()
 
+            # Write the final transcription to a text file
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(final_transcription.strip())
 
-        # Speech_rec = SpeechRec()
-        # recognizer = sr.Recognizer()
-        # # while True:
-        # #     self.display_text(SpeechRec().record_live_audio_and_transcribe())
-
-        # while not keyboard.is_pressed('space'):
-        #     pass  # Wait for the spacebar to start recording
-
-        # print("Recording started... Speak now! Press spacebar to stop.")
-
-        # with sr.Microphone() as source:
-        #     recognizer.adjust_for_ambient_noise(source)
-        #     try:
-        #         # while True:
-        #         #     if keyboard.is_pressed('space'):
-        #         #         print("Recording stopped.")
-        #         #         break
-        #         audio_data = recognizer.listen(
-        #             source, timeout=10, phrase_time_limit=5)
-        #         transcription = Speech_rec.get_transcription_from_audio(
-        #             audio_data, lang)
-        #         Speech_rec.append_transcription_to_file(
-        #             transcription, output_file)
-        #         self.display_text(transcription)
-        #     except sr.WaitTimeoutError:
-        #         pass
-
-    def _safe_dislay(self, content):
+    # We have to have a safe display funtion to not have race conditions or rare crashes. The safe display makes sure the textbox always updates from the main Thread.
+    # Blame Tkinter for not being thread safe
+    def _safe_display(self, content):
         self.text_box.after(0, lambda: self._update_text_box(content))
 
     def _update_text_box(self, content):

@@ -1,1 +1,1 @@
-hello does this work it does that tries her best to work but so how i made this work is with multi threading so that when it actively translates or transcribes the text it doesn't grass the u i what is pretty cool so well although there's no punctuation or any of that kind i'd say these are acceptable results if you ask me
+the hello i do not know why it always says the when you start a model but whatever
