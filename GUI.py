@@ -8,6 +8,9 @@ from offline_speech_recognition import OfflineSpeechRecognition
 import socket
 import keyboard
 import threading
+import sounddevice as sd
+from scipy.io.wavfile import write
+import numpy as np
 
 # Function to check for internet connection
 
@@ -119,61 +122,58 @@ class SpeechRecognitionApp:
             self.display_text(f"Transcription:\n{content}")
         except Exception as e:
             self.display_text(f"Error reading text file: {e}")
-
-    def use_live_audio(self, lang="en-US", output_file="live_output.txt"):
-        if hasattr(self, 'is_recording') and self.is_recording:
+            
+            
+    def use_live_audio(self):
+        if hasattr(self, 'recording') and self.recording:
             # Stop recording
-            self.is_recording = False
-            self.display_text("Recording stopped.")
+            self.recording = False
+            self.btn_live.config(text="Live Recording")
+        else:
+            # Start recording
+            self.recording = True
+            self.btn_live.config(text="Stop Recording")
+            threading.Thread(target=self.record_audio).start()
+
+    def record_audio(self):
+
+        self.display_text("Recording... Press 'Stop Recording' to finish.")
+        fs = 44100  # Sample rate
+        seconds = 0  # Duration is dynamic based on button press
+        audio_data = []
+
+        def callback(indata, frames, time, status):
+            if self.recording:
+                audio_data.append(indata.copy())
+            else:
+                raise sd.CallbackStop()
+
+        try:
+            with sd.InputStream(samplerate=fs, channels=1, callback=callback):
+                while self.recording:
+                    sd.sleep(100)
+        except Exception as e:
+            self.display_text(f"Error during recording: {e}")
             return
 
-        # Start recording
-        self.is_recording = True
-        recognizer = sr.Recognizer()
-        self.display_text("Recording started... Speak now!")
+        # Save the recording
+        audio_array = np.concatenate(audio_data, axis=0)
+        write("live_recording.wav", fs, (audio_array * 32767).astype(np.int16))
+        self.display_text("Recording saved as 'live_recording.wav'.")
+        # Process the saved recording
+        try:
+            if check_internet_connection():
+                text = SpeechRec().transcribe_audio_file("live_recording.wav", "output.txt")
+            else:
+                # Initialize offline recognizer
+                self.offline_recognizer = OfflineSpeechRecognition(
+                    r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
+                converted_path = self.offline_recognizer.convert_to_wav_mono_pcm("live_recording.wav")
+                text = self.offline_recognizer.transcribe_audio_file(converted_path)
+            self.display_text(text)
+        except Exception as e:
+            self.display_text(f"Error processing live recording: {e}")
 
-        def record_audio():
-            with sr.Microphone() as source:
-                recognizer.adjust_for_ambient_noise(source)
-                self.display_text("Listening...")
-
-                try:
-                    while self.is_recording:
-                        audio_data = recognizer.listen(source, timeout=None, phrase_time_limit=None)
-                        self.display_text("Processing audio...")
-
-                        # Save the audio data to a WAV file
-                        audio_file_path = "live_recording.wav"
-                        with open(audio_file_path, "wb") as audio_file:
-                            audio_file.write(audio_data.get_wav_data())
-
-                        self.display_text("Audio saved. Processing transcription...")
-
-                        # Transcribe the saved audio file
-                        if check_internet_connection():
-                            text = SpeechRec().transcribe_audio_file(audio_file_path, output_file)
-                        else:
-                            # Initialize offline recognizer
-                            self.offline_recognizer = OfflineSpeechRecognition(
-                                r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
-                            converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(audio_file_path)
-                            text = self.offline_recognizer.transcribe_audio_file(converted_path)
-
-                        self.display_text(f"Live Transcription:\n{text}")
-
-                        # Save transcription to a file
-                        with open(output_file, 'w') as file:
-                            file.write(text)
-                except sr.WaitTimeoutError:
-                    # Continue listening if no speech is detected
-                    self.display_text("No speech detected, still listening...")
-                except Exception as e:
-                    self.display_text(f"Error during live transcription: {e}")
-                    
-                    
-
-        # Run the recording in a separate thread to avoid blocking the UI
-        threading.Thread(target=record_audio, daemon=True).start()
 
     def quit_app(self):
         self.root.quit()
