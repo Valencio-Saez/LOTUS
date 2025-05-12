@@ -10,7 +10,7 @@ import webrtcvad
 import collections
 import wave
 import pyaudio
-
+import threading
 # Function to check for internet connection
 
 
@@ -44,14 +44,11 @@ class SpeechRecognitionApp:
         # Buttons inside the image
         self.btn_select = tk.Button(
             root, text="Select File", command=self.select_file, width=20, height=2)
-        self.btn_live = tk.Button(
-            root, text="Live Recording", command=self.use_live_audio, width=20, height=2)
         self.btn_quit = tk.Button(
             root, text="Quit", command=self.quit_app, width=20, height=2)
 
         # Positioning buttons over the image
         self.canvas.create_window(165, 150, window=self.btn_select)
-        self.canvas.create_window(165, 235, window=self.btn_live)
         self.canvas.create_window(165, 321, window=self.btn_quit)
 
         # Add a Text widget for transcription display
@@ -70,6 +67,9 @@ class SpeechRecognitionApp:
         # Positioning the scrollbar next to the text box
         self.canvas.create_window(590, 420, window=self.scrollbar)
 
+        # Start background live audio processing
+        threading.Thread(target=self.use_live_audio_loop, daemon=True).start()
+
     def select_file(self, hidden=False):
         initial_dir = os.path.dirname(os.path.abspath(__file__))
         file_path = filedialog.askopenfilename(initialdir=initial_dir)
@@ -81,21 +81,11 @@ class SpeechRecognitionApp:
         else:
             self.display_text("No file selected")
 
-    def display_text(self, content):
-        self.text_box.delete(1.0, tk.END)
-        words = content.split()
-        line = "Transcription complete:\n"
-        for word in words:
-            if len(line) + len(word) + 1 > 75:
-                self.text_box.insert(tk.END, line + '\n')
-                line = word
-            else:
-                if line:
-                    line += " " + word
-                else:
-                    line = word
-        if line:
-            self.text_box.insert(tk.END, line + '\n')
+    def display_text(self, content, clear=False):
+        if clear:
+            self.text_box.delete(1.0, tk.END)
+        self.text_box.insert(tk.END, content + "\n")
+        self.text_box.see(tk.END)  # Auto-scroll to bottom
 
     def read_wav(self, file_path):
         try:
@@ -122,8 +112,8 @@ class SpeechRecognitionApp:
         except Exception as e:
             self.display_text(f"Error reading text file: {e}")
 
-    def use_live_audio(self, lang="en-US", output_file="live_output.txt"):
-        self.display_text("Using live audio")
+    def use_live_audio_loop(self, lang="en-US", output_file="live_output.txt"):
+        self.display_text("Using live audio...", clear=True)
         # 0 -3 more aggrassive is more filtering of none speech
         vad = webrtcvad.Vad(1)
         # Set up audio recording parameters
@@ -144,60 +134,63 @@ class SpeechRecognitionApp:
 
         # Ring buffer to store recent frames for VAD triggering logic
         ring_buffer = collections.deque(maxlen=buffer_size)
-        triggered = False
-        voiced_frames = []
 
         try:
             while True:
-                # Read a single audio frame
-                frame = stream.read(frame_size, exception_on_overflow=False)
-                is_speech = vad.is_speech(frame, rate)
+                triggered = False
+                voiced_frames = []
+                ring_buffer.clear()
+                self.display_text("Listening for speech...", clear=False)
 
-                if not triggered:
-                    # Buffer incoming frames while waiting for speech
+                # Wait for speech to begin
+                while not triggered:
+                    frame = stream.read(
+                        frame_size, exception_on_overflow=False)
+                    is_speech = vad.is_speech(frame, rate)
                     ring_buffer.append((frame, is_speech))
-                    num_voiced = len(
-                        [f for f, speech in ring_buffer if speech])
-                    # If majority of buffered frames are speech, start recording (80%)
-                    if num_voiced > 0.8 * ring_buffer.maxlen:
+                    if len([f for f, s in ring_buffer if s]) > 0.8 * buffer_size:
                         triggered = True
-                        self.display_text("Recording")
                         for f, s in ring_buffer:
                             voiced_frames.append(f)
                         ring_buffer.clear()
-                else:
-                    # Continue recording while speech is detected
+
+                # Record while speech continues
+                while True:
+                    frame = stream.read(
+                        frame_size, exception_on_overflow=False)
                     voiced_frames.append(frame)
+                    is_speech = vad.is_speech(frame, rate)
                     ring_buffer.append((frame, is_speech))
-                    num_unvoiced = len(
-                        [f for f, speech in ring_buffer if not speech])
-                    # If most of recent frames are non-speech, stop recording (80%)
-                    if num_unvoiced > 0.8 * ring_buffer.maxlen:
-                        self.display_text("Stopped recording")
+                    if len([f for f, s in ring_buffer if not s]) > 0.8 * buffer_size:
                         break
+
+                # Save to temp wav file
+                temp_wav_path = "temp_vad_output.wav"
+                with wave.open(temp_wav_path, 'wb') as wf:
+                    wf.setnchannels(1)
+                    wf.setsampwidth(pa.get_sample_size(format))
+                    wf.setframerate(rate)
+                    wf.writeframes(b''.join(voiced_frames))
+
+                try:
+                    Speech_rec = SpeechRec()
+                    print("[DEBUG] Starting transcription...")
+                    transcription = Speech_rec.transcribe_audio_file(
+                        temp_wav_path, output_file)
+                    print(f"[DEBUG] Transcription result: {transcription!r}")
+                    if not transcription.strip():
+                        self.display_text(transcription, clear=False)
+                    else:
+                        Speech_rec.append_transcription_to_file(
+                            transcription, output_file)
+                        self.display_text(transcription)
+                except Exception as e:
+                    self.display_text(f"Error transcribing audio: {e}")
+
         finally:
-            # Clean up audio resources
             stream.stop_stream()
             stream.close()
             pa.terminate()
-
-        # Save recorded speech frames to a temporary WAV file
-        temp_wav_path = "temp_vad_output.wav"
-        with wave.open(temp_wav_path, 'wb') as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(pa.get_sample_size(format))
-            wf.setframerate(rate)
-            wf.writeframes(b''.join(voiced_frames))
-
-        try:
-            # Transcribe the recorded speech using online recognizer
-            Speech_rec = SpeechRec()
-            transcription = Speech_rec.transcribe_audio_file(
-                temp_wav_path, output_file)
-            Speech_rec.append_transcription_to_file(transcription, output_file)
-            self.display_text(transcription)
-        except Exception as e:
-            self.display_text(f"Error transcribing audio {e}")
 
     def quit_app(self):
         self.root.quit()
