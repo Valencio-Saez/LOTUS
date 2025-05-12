@@ -126,12 +126,15 @@ class SpeechRecognitionApp:
         self.display_text("Using live audio")
         # 0 -3 more aggrassive is more filtering of none speech
         vad = webrtcvad.Vad(1)
+        # Set up audio recording parameters
         format = pyaudio.paInt16
-        channels = 1
-        rate = 16000
+        channels = 1    # Mono audio
+        rate = 16000    # Sample rate required by VAD and most ASR models
         frame_duration = 30  # ms
+        # Number of samples per frame
         frame_size = int(rate * frame_duration / 1000)
         buffer_size = 10  # number of frames to collect
+        # Set up PyAudio input stream
         pa = pyaudio.PyAudio()
         stream = pa.open(format=format,
                          channels=channels,
@@ -139,19 +142,23 @@ class SpeechRecognitionApp:
                          input=True,
                          frames_per_buffer=frame_size)
 
+        # Ring buffer to store recent frames for VAD triggering logic
         ring_buffer = collections.deque(maxlen=buffer_size)
         triggered = False
         voiced_frames = []
 
         try:
             while True:
+                # Read a single audio frame
                 frame = stream.read(frame_size, exception_on_overflow=False)
                 is_speech = vad.is_speech(frame, rate)
 
                 if not triggered:
+                    # Buffer incoming frames while waiting for speech
                     ring_buffer.append((frame, is_speech))
                     num_voiced = len(
                         [f for f, speech in ring_buffer if speech])
+                    # If majority of buffered frames are speech, start recording (80%)
                     if num_voiced > 0.8 * ring_buffer.maxlen:
                         triggered = True
                         self.display_text("Recording")
@@ -159,18 +166,22 @@ class SpeechRecognitionApp:
                             voiced_frames.append(f)
                         ring_buffer.clear()
                 else:
+                    # Continue recording while speech is detected
                     voiced_frames.append(frame)
                     ring_buffer.append((frame, is_speech))
                     num_unvoiced = len(
                         [f for f, speech in ring_buffer if not speech])
+                    # If most of recent frames are non-speech, stop recording (80%)
                     if num_unvoiced > 0.8 * ring_buffer.maxlen:
                         self.display_text("Stopped recording")
                         break
         finally:
+            # Clean up audio resources
             stream.stop_stream()
             stream.close()
             pa.terminate()
 
+        # Save recorded speech frames to a temporary WAV file
         temp_wav_path = "temp_vad_output.wav"
         with wave.open(temp_wav_path, 'wb') as wf:
             wf.setnchannels(1)
@@ -179,6 +190,7 @@ class SpeechRecognitionApp:
             wf.writeframes(b''.join(voiced_frames))
 
         try:
+            # Transcribe the recorded speech using online recognizer
             Speech_rec = SpeechRec()
             transcription = Speech_rec.transcribe_audio_file(
                 temp_wav_path, output_file)
@@ -186,31 +198,6 @@ class SpeechRecognitionApp:
             self.display_text(transcription)
         except Exception as e:
             self.display_text(f"Error transcribing audio {e}")
-        # recognizer = sr.Recognizer()
-        # # while True:
-        # #     self.display_text(SpeechRec().record_live_audio_and_transcribe())
-
-        # while not keyboard.is_pressed('space'):
-        #     pass  # Wait for the spacebar to start recording
-
-        # print("Recording started... Speak now! Press spacebar to stop.")
-
-        # with sr.Microphone() as source:
-        #     recognizer.adjust_for_ambient_noise(source)
-        #     try:
-        #         # while True:
-        #         #     if keyboard.is_pressed('space'):
-        #         #         print("Recording stopped.")
-        #         #         break
-        #         audio_data = recognizer.listen(
-        #             source, timeout=10, phrase_time_limit=5)
-        #         transcription = Speech_rec.get_transcription_from_audio(
-        #             audio_data, lang)
-        #         Speech_rec.append_transcription_to_file(
-        #             transcription, output_file)
-        #         self.display_text(transcription)
-        #     except sr.WaitTimeoutError:
-        #         pass
 
     def quit_app(self):
         self.root.quit()
