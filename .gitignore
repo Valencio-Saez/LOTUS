@@ -1,0 +1,5 @@
+vosk-model-*
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
