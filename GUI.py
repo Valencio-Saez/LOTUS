@@ -7,6 +7,10 @@ from speech_to_text import SpeechRec
 from offline_speech_recognition import OfflineSpeechRecognition
 import socket
 import keyboard
+import threading
+import sounddevice as sd
+from scipy.io.wavfile import write
+import numpy as np
 
 # Function to check for internet connection
 
@@ -118,35 +122,58 @@ class SpeechRecognitionApp:
             self.display_text(f"Transcription:\n{content}")
         except Exception as e:
             self.display_text(f"Error reading text file: {e}")
+            
+            
+    def use_live_audio(self):
+        if hasattr(self, 'recording') and self.recording:
+            # Stop recording
+            self.recording = False
+            self.btn_live.config(text="Live Recording")
+        else:
+            # Start recording
+            self.recording = True
+            self.btn_live.config(text="Stop Recording")
+            threading.Thread(target=self.record_audio).start()
 
-    def use_live_audio(self, lang="en-US", output_file="live_output.txt"):
-        self.display_text("Using live audio")
-        Speech_rec = SpeechRec()
-        recognizer = sr.Recognizer()
-        # while True:
-        #     self.display_text(SpeechRec().record_live_audio_and_transcribe())
+    def record_audio(self):
 
-        while not keyboard.is_pressed('space'):
-            pass  # Wait for the spacebar to start recording
+        self.display_text("Recording... Press 'Stop Recording' to finish.")
+        fs = 44100  # Sample rate
+        seconds = 0  # Duration is dynamic based on button press
+        audio_data = []
 
-        print("Recording started... Speak now! Press spacebar to stop.")
+        def callback(indata, frames, time, status):
+            if self.recording:
+                audio_data.append(indata.copy())
+            else:
+                raise sd.CallbackStop()
 
-        with sr.Microphone() as source:
-            recognizer.adjust_for_ambient_noise(source)
-            try:
-                # while True:
-                #     if keyboard.is_pressed('space'):
-                #         print("Recording stopped.")
-                #         break
-                audio_data = recognizer.listen(
-                    source, timeout=10, phrase_time_limit=5)
-                transcription = Speech_rec.get_transcription_from_audio(
-                    audio_data, lang)
-                Speech_rec.append_transcription_to_file(
-                    transcription, output_file)
-                self.display_text(transcription)
-            except sr.WaitTimeoutError:
-                pass
+        try:
+            with sd.InputStream(samplerate=fs, channels=1, callback=callback):
+                while self.recording:
+                    sd.sleep(100)
+        except Exception as e:
+            self.display_text(f"Error during recording: {e}")
+            return
+
+        # Save the recording
+        audio_array = np.concatenate(audio_data, axis=0)
+        write("live_recording.wav", fs, (audio_array * 32767).astype(np.int16))
+        self.display_text("Recording saved as 'live_recording.wav'.")
+        # Process the saved recording
+        try:
+            if check_internet_connection():
+                text = SpeechRec().transcribe_audio_file("live_recording.wav", "output.txt")
+            else:
+                # Initialize offline recognizer
+                self.offline_recognizer = OfflineSpeechRecognition(
+                    r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
+                converted_path = self.offline_recognizer.convert_to_wav_mono_pcm("live_recording.wav")
+                text = self.offline_recognizer.transcribe_audio_file(converted_path)
+            self.display_text(text)
+        except Exception as e:
+            self.display_text(f"Error processing live recording: {e}")
+
 
     def quit_app(self):
         self.root.quit()

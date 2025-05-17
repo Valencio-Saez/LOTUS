@@ -55,19 +55,29 @@ class SpeechRec:
 
         with sr.Microphone() as source:
             recognizer.adjust_for_ambient_noise(source)
+            print("Listening...")
+
             try:
-                while True:
-                    if keyboard.is_pressed('space'):
-                        print("Recording stopped.")
-                    audio_data = recognizer.listen(
-                        source, timeout=10, phrase_time_limit=5)
-                    transcription = self.get_transcription_from_audio(
-                        audio_data, lang)
-                    self.append_transcription_to_file(
-                        transcription, output_file)
-                    return f"Transcription:\n{transcription}"
-            except sr.WaitTimeoutError:
-                pass
+                audio_data = recognizer.listen(source, timeout=None, phrase_time_limit=None)
+                print("Recording stopped.")
+            except KeyboardInterrupt:
+                print("Recording interrupted.")
+
+        print("Saving audio file...")
+
+        # Save the recorded audio to a WAV file
+        temp_audio_file = "live_recording.wav"
+        with open(temp_audio_file, "wb") as f:
+            f.write(audio_data.get_wav_data())
+
+        print(f"Audio file saved as {temp_audio_file}. Transcribing...")
+
+        # Use the existing methods to transcribe the saved audio file
+        try:
+            transcription = self.transcribe_audio_file(temp_audio_file, output_file, lang)
+            print(f"Transcription:\n{transcription}")
+        except Exception as error:
+            print(f"Error during transcription: {error}")
 
     def clear_console(self):
         os.system('cls' if os.name == 'nt' else 'clear')
