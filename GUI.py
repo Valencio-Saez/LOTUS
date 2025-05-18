@@ -103,30 +103,25 @@ class SpeechRecognitionApp:
         if not hasattr(self, "recording") or not self.recording:
             return
 
-        def get_rms(block):
-            # AI magic
-            return np.sqrt(np.mean(block**2)) if len(block) > 0 else 0
+        def audio_callback(indata, frames, time, status):
+            volume_norm = np.linalg.norm(indata) * 10
+            self.current_rms = volume_norm
 
-        try:
-            block = sd.rec(int(1024), samplerate=44100,
-                           channels=1, dtype='float32')
-            sd.wait()
-            rms = get_rms(block)
-            scale = min(1.0 + rms * 20, 2.0)
-        except:
-            scale = 1.0
+        # Initialize once
+        if not hasattr(self, "audio_stream"):
+            self.current_rms = 0
+            self.audio_stream = sd.InputStream(callback=audio_callback)
+            self.audio_stream.start()
 
-        # Adjust oval size based on volume
+        # Normalize and cap scale
+        scale = 1.0 + min(self.current_rms / 10.0, 1.0)
         x_center, y_center = 400, 250
         r = int(80 * scale)
         self.canvas.coords(self.btn_live_oval,
                            x_center - r, y_center - r,
                            x_center + r, y_center + r)
-
-        # Keep the text inside the button centered
         self.canvas.coords(self.btn_live_text, x_center, y_center)
 
-        # Schedule next animation frame
         self.root.after(100, self.animate_button)
 
     def select_file(self, hidden=False):
@@ -185,12 +180,16 @@ class SpeechRecognitionApp:
         if hasattr(self, 'recording') and self.recording:
             # Stop recording
             self.recording = False
+            if hasattr(self, "audio_stream"):
+                self.audio_stream.stop()
+                self.audio_stream.close()
+                del self.audio_stream
             self.canvas.itemconfig(self.btn_live_text, text="Live Recording")
         else:
             # Start recording
             self.recording = True
             self.canvas.itemconfig(self.btn_live_text, text="Stop Recording")
-            self.animate_button()
+            # self.animate_button()
             threading.Thread(target=self.record_audio).start()
 
     def record_audio(self):
