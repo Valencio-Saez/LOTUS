@@ -99,6 +99,36 @@ class SpeechRecognitionApp:
         button.config(font=("Helvetica", 12, "bold"))
         button.config(wraplength=120)
 
+    def animate_button(self):
+        if not hasattr(self, "recording") or not self.recording:
+            return
+
+        def get_rms(block):
+            # AI magic
+            return np.sqrt(np.mean(block**2)) if len(block) > 0 else 0
+
+        try:
+            block = sd.rec(int(1024), samplerate=44100,
+                           channels=1, dtype='float32')
+            sd.wait()
+            rms = get_rms(block)
+            scale = min(1.0 + rms * 20, 2.0)
+        except:
+            scale = 1.0
+
+        # Adjust oval size based on volume
+        x_center, y_center = 400, 250
+        r = int(80 * scale)
+        self.canvas.coords(self.btn_live_oval,
+                           x_center - r, y_center - r,
+                           x_center + r, y_center + r)
+
+        # Keep the text inside the button centered
+        self.canvas.coords(self.btn_live_text, x_center, y_center)
+
+        # Schedule next animation frame
+        self.root.after(100, self.animate_button)
+
     def select_file(self, hidden=False):
         initial_dir = os.path.dirname(os.path.abspath(__file__))
         file_path = filedialog.askopenfilename(initialdir=initial_dir)
@@ -160,6 +190,7 @@ class SpeechRecognitionApp:
             # Start recording
             self.recording = True
             self.canvas.itemconfig(self.btn_live_text, text="Stop Recording")
+            self.animate_button()
             threading.Thread(target=self.record_audio).start()
 
     def record_audio(self):
