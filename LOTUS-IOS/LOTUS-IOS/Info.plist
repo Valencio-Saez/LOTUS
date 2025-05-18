@@ -2,9 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>remote-notification</string>
-	</array>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>This app needs speech recognition to transcribe your voice.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>This app needs microphone access to record your voice.</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.valenciomuskiet.LOTUS-IOS.LOTUS-IOS</string>
+
 </dict>
 </plist>

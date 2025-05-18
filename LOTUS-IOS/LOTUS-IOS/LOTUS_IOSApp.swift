@@ -11,13 +11,24 @@ import SwiftData
 @main
 struct LOTUS_IOSApp: App {
     var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
+        let schema = Schema([Item.self])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            let container = try ModelContainer(for: schema, configurations: [modelConfiguration])
+            
+            // Insert sample data if empty
+            let context = container.mainContext
+            let fetchDescriptor = FetchDescriptor<Item>()
+            let existingItems = try context.fetch(fetchDescriptor)
+
+            if existingItems.isEmpty {
+                let newItem = Item(timestamp: Date())
+                context.insert(newItem)
+                try context.save()
+            }
+
+            return container
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
