@@ -31,45 +31,68 @@ class SpeechRecognitionApp:
         self.root = root
         self.root.title("Speech Recognition")
         self.root.geometry("800x600")
+        self.root.configure(bg="#212121")
+
+        self.btn_select = tk.Button(root, command=self.select_file)
+        self.btn_quit = tk.Button(root, command=self.quit_app)
+
+        self.btn_live = tk.Button(
+            root,
+            text="Live Recording",
+            command=self.use_live_audio,
+            bg="#171717",
+            fg="white",
+            font=("Helvetica", 14, "bold"),
+            activebackground="#2e2e2e",
+            activeforeground="white",
+            bd=0,
+            highlightthickness=0
+        )
+
+        self.btn_live.place(relx=0.5, rely=0.5,
+                            anchor=tk.CENTER, width=160, height=160)
+        self.btn_live.configure(cursor="hand2")
+
+        self.btn_live.configure(relief="flat")
+
+        self.btn_live.after(10, lambda: self.make_button_round(self.btn_live))
 
         # Load and display the image
         self.image_path = "logo.png"  # Ensure this file is in the same directory
-        self.image = Image.open(self.image_path)
-        self.image = self.image.resize((600, 500), Image.LANCZOS)
-        self.photo = ImageTk.PhotoImage(self.image)
+        # self.image = Image.open(self.image_path)
+        # self.image = self.image.resize((600, 500), Image.LANCZOS)
+        # self.photo = ImageTk.PhotoImage(self.image)
 
-        self.canvas = tk.Canvas(root, width=600, height=500)
-        self.canvas.pack()
-        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
-
-        # Buttons inside the image
-        self.btn_select = tk.Button(
-            root, text="Select File", command=self.select_file, width=20, height=2)
-        self.btn_live = tk.Button(
-            root, text="Live Recording", command=self.use_live_audio, width=20, height=2)
-        self.btn_quit = tk.Button(
-            root, text="Quit", command=self.quit_app, width=20, height=2)
+        # self.canvas = tk.Canvas(root, width=600, height=500)
+        # self.canvas.pack()
+        # self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
 
         # Positioning buttons over the image
-        self.canvas.create_window(165, 150, window=self.btn_select)
-        self.canvas.create_window(165, 235, window=self.btn_live)
-        self.canvas.create_window(165, 321, window=self.btn_quit)
+        # self.canvas.create_window(165, 150, window=self.btn_select)
+        # self.canvas.create_window(165, 235, window=self.btn_live)
+        # self.canvas.create_window(165, 321, window=self.btn_quit)
 
         # Add a Text widget for transcription display
         self.text_box = tk.Text(root, width=70, height=6.5, wrap=tk.WORD)
 
         # Add a Scrollbar widget
-        self.scrollbar = tk.Scrollbar(
-            root, orient=tk.VERTICAL, command=self.text_box.yview)
+        # self.scrollbar = tk.Scrollbar(
+        #     root, orient=tk.VERTICAL, command=self.text_box.yview)
 
-        # Configure the Text widget to work with the Scrollbar
-        self.text_box.configure(yscrollcommand=self.scrollbar.set)
+        # # Configure the Text widget to work with the Scrollbar
+        # self.text_box.configure(yscrollcommand=self.scrollbar.set)
 
-        # Position the Text widget and Scrollbar on the canvas
-        # Positioning the text box
-        self.canvas.create_window(300, 420, window=self.text_box)
-        # Positioning the scrollbar next to the text box
-        self.canvas.create_window(590, 420, window=self.scrollbar)
+        # # Position the Text widget and Scrollbar on the canvas
+        # # Positioning the text box
+        # self.canvas.create_window(300, 420, window=self.text_box)
+        # # Positioning the scrollbar next to the text box
+        # self.canvas.create_window(590, 420, window=self.scrollbar)
+
+    def make_button_round(self, button):
+        button.config(borderwidth=0)
+        button.config(highlightthickness=0)
+        button.config(font=("Helvetica", 12, "bold"))
+        button.config(wraplength=120)
 
     def select_file(self, hidden=False):
         initial_dir = os.path.dirname(os.path.abspath(__file__))
@@ -122,8 +145,7 @@ class SpeechRecognitionApp:
             self.display_text(f"Transcription:\n{content}")
         except Exception as e:
             self.display_text(f"Error reading text file: {e}")
-            
-            
+
     def use_live_audio(self):
         if hasattr(self, 'recording') and self.recording:
             # Stop recording
@@ -168,12 +190,13 @@ class SpeechRecognitionApp:
                 # Initialize offline recognizer
                 self.offline_recognizer = OfflineSpeechRecognition(
                     r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
-                converted_path = self.offline_recognizer.convert_to_wav_mono_pcm("live_recording.wav")
-                text = self.offline_recognizer.transcribe_audio_file(converted_path)
+                converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(
+                    "live_recording.wav")
+                text = self.offline_recognizer.transcribe_audio_file(
+                    converted_path)
             self.display_text(text)
         except Exception as e:
             self.display_text(f"Error processing live recording: {e}")
-
 
     def quit_app(self):
         self.root.quit()
