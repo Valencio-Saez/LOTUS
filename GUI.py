@@ -57,21 +57,41 @@ class SpeechRecognitionApp:
             fill="white", font=("Helvetica", 12, "bold")
         )
 
+        # Hover effect functions
+        def on_enter(event):
+            self.canvas.itemconfig(
+                self.btn_live_oval, fill="#2a2a2a")  # lighter shade
+
+        def on_leave(event):
+            self.canvas.itemconfig(
+                self.btn_live_oval, fill="#171717")  # original color
+
+        # Bind hover to both oval and text
+        self.canvas.tag_bind(self.btn_live_oval, "<Enter>", on_enter)
+        self.canvas.tag_bind(self.btn_live_oval, "<Leave>", on_leave)
+        self.canvas.tag_bind(self.btn_live_text, "<Enter>", on_enter)
+        self.canvas.tag_bind(self.btn_live_text, "<Leave>", on_leave)
+
         # Bind click events to both oval and text
         self.canvas.tag_bind(self.btn_live_oval, "<Button-1>",
                              lambda e: self.use_live_audio())
         self.canvas.tag_bind(self.btn_live_text, "<Button-1>",
                              lambda e: self.use_live_audio())
 
-        # Text box for transcription at bottom
-        self.text_box = tk.Text(root, width=90, height=7, bg="#1e1e1e",
-                                fg="white", insertbackground='white', wrap="word", bd=0)
-        self.text_box.place(relx=0.5, rely=0.90, anchor="center")
+        # Frame to hold text box and scrollbar together
+        text_frame = tk.Frame(root, bg="#212121")
+        text_frame.place(relx=0.5, rely=0.90, anchor="center")
 
-        # Scrollbar for the text box
-        self.scrollbar = tk.Scrollbar(root, command=self.text_box.yview)
+        # Text box
+        self.text_box = tk.Text(text_frame, width=90, height=7, bg="#1e1e1e",
+                                fg="white", insertbackground='white', wrap="word", bd=0)
+        self.text_box.pack(side=tk.LEFT, fill=tk.BOTH)
+
+        # Scrollbar
+        self.scrollbar = tk.Scrollbar(text_frame, command=self.text_box.yview)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
         self.text_box.config(yscrollcommand=self.scrollbar.set)
-        self.scrollbar.place(relx=0.97, rely=0.90, anchor='ne', height=120)
 
     def make_button_round(self, button):
         button.config(borderwidth=0)
@@ -139,7 +159,7 @@ class SpeechRecognitionApp:
         else:
             # Start recording
             self.recording = True
-            self.canvas.itemconfig(self.btn_live_text ,text="Stop Recording")
+            self.canvas.itemconfig(self.btn_live_text, text="Stop Recording")
             threading.Thread(target=self.record_audio).start()
 
     def record_audio(self):
