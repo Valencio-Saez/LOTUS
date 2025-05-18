@@ -33,60 +33,45 @@ class SpeechRecognitionApp:
         self.root.geometry("800x600")
         self.root.configure(bg="#212121")
 
-        self.btn_select = tk.Button(root, command=self.select_file)
-        self.btn_quit = tk.Button(root, command=self.quit_app)
+        # Create menu bar
+        menu_bar = tk.Menu(self.root)
+        file_menu = tk.Menu(menu_bar, tearoff=0, bg="#2a2a2a", fg="white")
+        file_menu.add_command(label="Select File", command=self.select_file)
+        file_menu.add_separator()
+        file_menu.add_command(label="Quit", command=self.quit_app)
+        menu_bar.add_cascade(label="☰", menu=file_menu)
+        self.root.config(menu=menu_bar)
 
-        self.btn_live = tk.Button(
-            root,
-            text="Live Recording",
-            command=self.use_live_audio,
-            bg="#171717",
-            fg="white",
-            font=("Helvetica", 14, "bold"),
-            activebackground="#2e2e2e",
-            activeforeground="white",
-            bd=0,
-            highlightthickness=0
+        # Canvas to simulate a round button
+        self.canvas = tk.Canvas(root, bg="#212121", highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True)
+
+        # Draw round button (centered oval)
+        x_center, y_center, r = 400, 250, 80
+        self.btn_live_oval = self.canvas.create_oval(
+            x_center - r, y_center - r, x_center + r, y_center + r,
+            fill="#171717", outline=""
+        )
+        self.btn_live_text = self.canvas.create_text(
+            x_center, y_center, text="Live Recording",
+            fill="white", font=("Helvetica", 12, "bold")
         )
 
-        self.btn_live.place(relx=0.5, rely=0.5,
-                            anchor=tk.CENTER, width=160, height=160)
-        self.btn_live.configure(cursor="hand2")
+        # Bind click events to both oval and text
+        self.canvas.tag_bind(self.btn_live_oval, "<Button-1>",
+                             lambda e: self.use_live_audio())
+        self.canvas.tag_bind(self.btn_live_text, "<Button-1>",
+                             lambda e: self.use_live_audio())
 
-        self.btn_live.configure(relief="flat")
+        # Text box for transcription at bottom
+        self.text_box = tk.Text(root, width=90, height=7, bg="#1e1e1e",
+                                fg="white", insertbackground='white', wrap="word", bd=0)
+        self.text_box.place(relx=0.5, rely=0.90, anchor="center")
 
-        self.btn_live.after(10, lambda: self.make_button_round(self.btn_live))
-
-        # Load and display the image
-        self.image_path = "logo.png"  # Ensure this file is in the same directory
-        # self.image = Image.open(self.image_path)
-        # self.image = self.image.resize((600, 500), Image.LANCZOS)
-        # self.photo = ImageTk.PhotoImage(self.image)
-
-        # self.canvas = tk.Canvas(root, width=600, height=500)
-        # self.canvas.pack()
-        # self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
-
-        # Positioning buttons over the image
-        # self.canvas.create_window(165, 150, window=self.btn_select)
-        # self.canvas.create_window(165, 235, window=self.btn_live)
-        # self.canvas.create_window(165, 321, window=self.btn_quit)
-
-        # Add a Text widget for transcription display
-        self.text_box = tk.Text(root, width=70, height=6.5, wrap=tk.WORD)
-
-        # Add a Scrollbar widget
-        # self.scrollbar = tk.Scrollbar(
-        #     root, orient=tk.VERTICAL, command=self.text_box.yview)
-
-        # # Configure the Text widget to work with the Scrollbar
-        # self.text_box.configure(yscrollcommand=self.scrollbar.set)
-
-        # # Position the Text widget and Scrollbar on the canvas
-        # # Positioning the text box
-        # self.canvas.create_window(300, 420, window=self.text_box)
-        # # Positioning the scrollbar next to the text box
-        # self.canvas.create_window(590, 420, window=self.scrollbar)
+        # Scrollbar for the text box
+        self.scrollbar = tk.Scrollbar(root, command=self.text_box.yview)
+        self.text_box.config(yscrollcommand=self.scrollbar.set)
+        self.scrollbar.place(relx=0.97, rely=0.90, anchor='ne', height=120)
 
     def make_button_round(self, button):
         button.config(borderwidth=0)
@@ -150,11 +135,11 @@ class SpeechRecognitionApp:
         if hasattr(self, 'recording') and self.recording:
             # Stop recording
             self.recording = False
-            self.btn_live.config(text="Live Recording")
+            self.canvas.itemconfig(self.btn_live_text, text="Live Recording")
         else:
             # Start recording
             self.recording = True
-            self.btn_live.config(text="Stop Recording")
+            self.canvas.itemconfig(self.btn_live_text ,text="Stop Recording")
             threading.Thread(target=self.record_audio).start()
 
     def record_audio(self):
