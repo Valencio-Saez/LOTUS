@@ -13,7 +13,7 @@ struct ContentView: View {
     @State private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     @State private var micLevel: CGFloat = 0
 
-    
+
     var body: some View {
         VStack(spacing: 16) {
             Spacer()
@@ -75,8 +75,6 @@ struct ContentView: View {
             }
         }
     }
-
-    
     
     private func startRecording() {
         stopRecording()
@@ -119,8 +117,8 @@ struct ContentView: View {
         lastTranscription = ""
         micLevel = 0
 
+        
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-
         recognitionTask = recognizer?.recognitionTask(with: request) { result, error in
             if let result = result {
                 let text = result.bestTranscription.formattedString
@@ -151,6 +149,7 @@ struct ContentView: View {
 
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
+    
 
     private func updateMicLevel(buffer: AVAudioPCMBuffer) {
         guard let data = buffer.floatChannelData?[0] else { return }
@@ -159,6 +158,7 @@ struct ContentView: View {
         let rms = sqrt(values.map { $0 * $0 }.reduce(0, +) / Float(frames))
         micLevel = CGFloat(min(max(rms * 60, 0), 1))  // increased multiplier from 20 to 35
     }
+    
 
     private func highlightedText() -> AttributedString {
         var attributed = AttributedString(animatedTranscription)
