@@ -47,7 +47,7 @@ class SpeechRecognitionApp:
         self.canvas.pack(fill="both", expand=True)
 
         # Draw round button (centered oval)
-        x_center, y_center, r = 400, 250, 80
+        x_center, y_center, r = 400, 250, 120
         self.btn_live_oval = self.canvas.create_oval(
             x_center - r, y_center - r, x_center + r, y_center + r,
             fill="#171717", outline=""
@@ -96,7 +96,7 @@ class SpeechRecognitionApp:
     def make_button_round(self, button):
         button.config(borderwidth=0)
         button.config(highlightthickness=0)
-        button.config(font=("Helvetica", 12, "bold"))
+        button.config(font=("Helvetica", 30, "bold"))
         button.config(wraplength=120)
 
     def animate_button(self):
