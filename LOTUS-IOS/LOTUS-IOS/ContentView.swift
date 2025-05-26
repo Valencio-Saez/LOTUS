@@ -4,32 +4,52 @@ import Speech
 
 struct ContentView: View {
     private let audioEngine = AVAudioEngine()
-
+    
     @State private var isRecording = false
-    @State private var animatedTranscription = ""
-    @State private var lastTranscription = ""
+    @State private var fullTranscription = ""
+    @State private var lastAppendedTranscription = ""
     @State private var instruction = "Tap the lotus to start speaking"
     @State private var recognitionTask: SFSpeechRecognitionTask?
     @State private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     @State private var micLevel: CGFloat = 0
-
-
+    @State private var partialText = ""
+    
+    private let silenceDelay: TimeInterval = 1.5
+    @State private var silenceTimer: Timer? = nil
+    
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             Spacer()
-
-            Text(highlightedText())
-                .padding()
-                .multilineTextAlignment(.center)
-                .foregroundColor(.black)
-                .font(.headline)
-                .animation(.easeInOut, value: animatedTranscription)
-                .accessibilityLabel("Transcribed speech")
+            
+            ScrollViewReader { proxy in
+                ScrollView(.vertical, showsIndicators: true) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(fullTranscription.components(separatedBy: "\n"), id: \.self) { line in
+                            Text(line)
+                                .foregroundColor(.black)
+                                .font(.body)
+                                .multilineTextAlignment(.leading)
+                        }
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .id("Bottom")
+                }
+                .frame(height: 250)
+                .background(Color(white: 0.95))
+                .cornerRadius(12)
+                .padding(.horizontal)
+                .onChange(of: fullTranscription) { _ in
+                    withAnimation {
+                        proxy.scrollTo("Bottom", anchor: .bottom)
+                    }
+                }
+            }
 
             if isRecording {
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(Color(red: 1.0, green: 0.78, blue: 0.78))  // original soft pink
-                    .frame(width: micLevel * 200, height: 8)          // same height
+                    .fill(Color.red.opacity(0.6))
+                    .frame(width: micLevel * 200, height: 8)
                     .padding(.horizontal)
                     .animation(.linear(duration: 0.1), value: micLevel)
                     .accessibilityHidden(true)
@@ -40,67 +60,57 @@ struct ContentView: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(width: 200, height: 240)
                 .onTapGesture {
-                    if isRecording {
-                        stopRecording()
-                    } else {
-                        requestPermissionsAndStart()
-                    }
+                    isRecording ? stopRecording() : requestPermissionsAndStart()
                 }
-                .animation(.easeInOut(duration: 0.3), value: isRecording)
-                .accessibilityLabel(isRecording ? "Tap to stop recording" : "Tap to start recording")
+                .accessibilityLabel(isRecording ? "Stop recording" : "Start recording")
 
             Text(instruction)
                 .padding()
                 .multilineTextAlignment(.center)
-                .foregroundColor(.black)
-                .font(.title2)             // larger font size for instruction
-                .fontWeight(.semibold)
-                .accessibilityHint("Tap the lotus image above to begin or end speech transcription")
-
-            Spacer().frame(height: 100)
+                .foregroundColor(.gray)
+                .font(.title3)
+            
+            Spacer().frame(height: 60)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.white)
         .edgesIgnoringSafeArea(.all)
     }
 
     private func requestPermissionsAndStart() {
-        SFSpeechRecognizer.requestAuthorization { status in
-            guard status == .authorized else { return }
+        SFSpeechRecognizer.requestAuthorization { authStatus in
+            guard authStatus == .authorized else { return }
             AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                guard granted else { return }
-                DispatchQueue.main.async {
-                    startRecording()
+                if granted {
+                    DispatchQueue.main.async { startRecording() }
                 }
             }
         }
     }
-    
+
     private func startRecording() {
         stopRecording()
 
-        // Configure audio session
-        let session = AVAudioSession.sharedInstance()
+        let audioSession = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.record, mode: .measurement, options: .duckOthers)
-            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
-            print("Audio session setup failed: \(error.localizedDescription)")
+            print("Audio session error: \(error.localizedDescription)")
+            return
         }
 
-        // Set up recognition
-        let locale = Locale.current
-        let recognizer = SFSpeechRecognizer(locale: locale)
+        let recognizer = SFSpeechRecognizer(locale: Locale.current)
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let request = recognitionRequest else { return }
+        
         request.shouldReportPartialResults = true
         request.taskHint = .dictation
         request.requiresOnDeviceRecognition = false
 
-        let node = audioEngine.inputNode
-        let format = node.outputFormat(forBus: 0)
-        node.removeTap(onBus: 0)
-        node.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
+        let inputNode = audioEngine.inputNode
+        let format = inputNode.outputFormat(forBus: 0)
+        inputNode.removeTap(onBus: 0)
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
             request.append(buffer)
             updateMicLevel(buffer: buffer)
         }
@@ -108,29 +118,42 @@ struct ContentView: View {
         do {
             try audioEngine.start()
         } catch {
-            print("Unable to start audioEngine: \(error.localizedDescription)")
+            print("Audio engine error: \(error.localizedDescription)")
+            return
         }
 
-        instruction = "Recording..."
+        instruction = "Listening..."
         isRecording = true
-        animatedTranscription = ""
-        lastTranscription = ""
-        micLevel = 0
+        fullTranscription = ""
+        lastAppendedTranscription = ""
+        partialText = ""
 
-        
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         recognitionTask = recognizer?.recognitionTask(with: request) { result, error in
             if let result = result {
-                let text = result.bestTranscription.formattedString
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    animatedTranscription = text
+                let transcript = result.bestTranscription.formattedString
+                DispatchQueue.main.async {
+                    partialText = transcript
+                    
+                    silenceTimer?.invalidate()
+                    silenceTimer = Timer.scheduledTimer(withTimeInterval: silenceDelay, repeats: false) { _ in
+                        DispatchQueue.main.async {
+                            let newText = partialText.replacingOccurrences(of: lastAppendedTranscription, with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !newText.isEmpty {
+                                fullTranscription += (fullTranscription.isEmpty ? "" : "\n") + newText
+                                lastAppendedTranscription = partialText
+                            }
+                            partialText = ""
+                        }
+                    }
                 }
-                lastTranscription = text
             }
+
             if error != nil {
                 stopRecording()
             }
         }
+
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     private func stopRecording() {
@@ -143,35 +166,21 @@ struct ContentView: View {
         recognitionTask = nil
         isRecording = false
         instruction = "Tap the lotus to start speaking"
-        animatedTranscription = ""
-        lastTranscription = ""
         micLevel = 0
+        silenceTimer?.invalidate()
+        silenceTimer = nil
 
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
-    
 
     private func updateMicLevel(buffer: AVAudioPCMBuffer) {
-        guard let data = buffer.floatChannelData?[0] else { return }
-        let frames = Int(buffer.frameLength)
-        let values = Array(UnsafeBufferPointer(start: data, count: frames))
-        let rms = sqrt(values.map { $0 * $0 }.reduce(0, +) / Float(frames))
-        micLevel = CGFloat(min(max(rms * 60, 0), 1))  // increased multiplier from 20 to 35
-    }
-    
-
-    private func highlightedText() -> AttributedString {
-        var attributed = AttributedString(animatedTranscription)
-        let plain = String(animatedTranscription)
-        let parts = lastTranscription.split(whereSeparator: { $0.isWhitespace })
-        guard let last = parts.last else { return attributed }
-        if let range = plain.range(of: String(last), options: .backwards) {
-            let ns = NSRange(range, in: plain)
-            if let ar = Range(ns, in: attributed) {
-                attributed[ar].foregroundColor = Color(red:1.0, green:0.78, blue:0.78)
-                attributed[ar].font = .headline.bold()
-            }
-        }
-        return attributed
+        guard let channelData = buffer.floatChannelData?[0] else { return }
+        let frameLength = Int(buffer.frameLength)
+        let channelDataArray = Array(UnsafeBufferPointer(start: channelData, count: frameLength))
+        let sumSquares = channelDataArray.map { $0 * $0 }.reduce(0, +)
+        let meanSquare = sumSquares / Float(frameLength)
+        let rms = sqrt(meanSquare)
+        micLevel = CGFloat(min(max(rms * 50, 0), 1))
     }
 }
+
