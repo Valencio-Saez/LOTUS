@@ -30,46 +30,58 @@ class SpeechRecognitionApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Speech Recognition")
-        self.root.geometry("800x600")
+        self.root.geometry("900x600")
+        self.root.configure(bg="#f0f0f0")
 
-        # Load and display the image
-        self.image_path = "logo.png"  # Ensure this file is in the same directory
-        self.image = Image.open(self.image_path)
-        self.image = self.image.resize((600, 500), Image.LANCZOS)
-        self.photo = ImageTk.PhotoImage(self.image)
+        # Header Frame
+        header = tk.Frame(root, bg="#283593", height=60)
+        header.pack(fill=tk.X, side=tk.TOP)
+        header_label = tk.Label(header, text="LOTUS Speech Recognition", font=("Arial", 22, "bold"), fg="white", bg="#283593")
+        header_label.pack(pady=10)
 
-        self.canvas = tk.Canvas(root, width=600, height=500)
-        self.canvas.pack()
-        self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo)
+        # Main Frame
+        main_frame = tk.Frame(root, bg="#f0f0f0")
+        main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Buttons inside the image
+        # Sidebar for buttons
+        sidebar = tk.Frame(main_frame, bg="#3949ab", width=200)
+        sidebar.pack(fill=tk.Y, side=tk.LEFT)
+        sidebar.pack_propagate(False)
+
         self.btn_select = tk.Button(
-            root, text="Select File", command=self.select_file, width=20, height=2)
+            sidebar, text="Select File", command=self.select_file, width=18, height=2, bg="#5c6bc0", fg="white", font=("Arial", 12, "bold"))
+        self.btn_select.pack(pady=(40, 20))
+
         self.btn_live = tk.Button(
-            root, text="Live Recording", command=self.use_live_audio, width=20, height=2)
+            sidebar, text="Live Recording", command=self.use_live_audio, width=18, height=2, bg="#5c6bc0", fg="white", font=("Arial", 12, "bold"))
+        self.btn_live.pack(pady=20)
+
         self.btn_quit = tk.Button(
-            root, text="Quit", command=self.quit_app, width=20, height=2)
+            sidebar, text="Quit", command=self.quit_app, width=18, height=2, bg="#c62828", fg="white", font=("Arial", 12, "bold"))
+        self.btn_quit.pack(pady=20)
 
-        # Positioning buttons over the image
-        self.canvas.create_window(165, 150, window=self.btn_select)
-        self.canvas.create_window(165, 235, window=self.btn_live)
-        self.canvas.create_window(165, 321, window=self.btn_quit)
+        # Content area
+        content = tk.Frame(main_frame, bg="#f0f0f0")
+        content.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
 
-        # Add a Text widget for transcription display
-        self.text_box = tk.Text(root, width=70, height=6.5, wrap=tk.WORD)
+        # Logo
+        self.image_path = "logo.png"
+        self.image = Image.open(self.image_path)
+        self.image = self.image.resize((250, 200), Image.LANCZOS)
+        self.photo = ImageTk.PhotoImage(self.image)
+        logo_label = tk.Label(content, image=self.photo, bg="#f0f0f0")
+        logo_label.pack(pady=(30, 10))
 
-        # Add a Scrollbar widget
-        self.scrollbar = tk.Scrollbar(
-            root, orient=tk.VERTICAL, command=self.text_box.yview)
+        # Transcription box with scrollbar
+        text_frame = tk.Frame(content, bg="#f0f0f0")
+        text_frame.pack(pady=10, padx=20, fill=tk.BOTH, expand=True)
 
-        # Configure the Text widget to work with the Scrollbar
+        self.text_box = tk.Text(text_frame, width=60, height=12, wrap=tk.WORD, font=("Arial", 12))
+        self.text_box.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self.scrollbar = tk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.text_box.yview)
+        self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.text_box.configure(yscrollcommand=self.scrollbar.set)
-
-        # Position the Text widget and Scrollbar on the canvas
-        # Positioning the text box
-        self.canvas.create_window(300, 420, window=self.text_box)
-        # Positioning the scrollbar next to the text box
-        self.canvas.create_window(590, 420, window=self.scrollbar)
 
     def select_file(self, hidden=False):
         initial_dir = os.path.dirname(os.path.abspath(__file__))
