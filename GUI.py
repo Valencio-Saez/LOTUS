@@ -55,14 +55,15 @@ class SpeechRecognitionApp:
         sidebar.pack_propagate(False)
 
         # Load sidebar image for the select file button
-        self.sidebar_img = Image.open("sidebar.png").resize((160, 60), Image.LANCZOS)
+        self.sidebar_img = Image.open("sidebar.png").resize((40, 40), Image.LANCZOS)  # Square and smaller
         self.sidebar_photo = ImageTk.PhotoImage(self.sidebar_img)
 
         self.btn_select = tk.Button(
             sidebar, image=self.sidebar_photo, command=self.select_file,
-            bd=0, bg="#ffe4ec", activebackground="#ffe4ec", cursor="hand2"
+            bd=0, bg="#ffe4ec", activebackground="#ffe4ec", cursor="hand2",
+            width=40, height=40  # Ensure button is square
         )
-        self.btn_select.pack(pady=(40, 20))
+        self.btn_select.pack(pady=(5, 0), padx=(5, 0), anchor="nw")  # Minimal padding, top-left anchor
 
         # Content area
         content = tk.Frame(main_frame, bg="#fff")
