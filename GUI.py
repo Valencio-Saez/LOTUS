@@ -45,50 +45,41 @@ class SpeechRecognitionApp:
         )
         header_label.pack(pady=10)
 
-        # Main Frame
+        # Main Frame (no sidebar)
         main_frame = tk.Frame(root, bg="#fff")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Sidebar for buttons
-        sidebar = tk.Frame(main_frame, bg="#ffe4ec", width=200)
-        sidebar.pack(fill=tk.Y, side=tk.LEFT)
-        sidebar.pack_propagate(False)
-
-        # Load sidebar image for the select file button
-        self.sidebar_img = Image.open("sidebar.png").resize((40, 40), Image.LANCZOS)  # Square and smaller
-        self.sidebar_photo = ImageTk.PhotoImage(self.sidebar_img)
-
-        self.btn_select = tk.Button(
-            sidebar, image=self.sidebar_photo, command=self.select_file,
-            bd=0, bg="#ffe4ec", activebackground="#ffe4ec", cursor="hand2",
-            width=40, height=40  # Ensure button is square
-        )
-        self.btn_select.pack(pady=(5, 0), padx=(5, 0), anchor="nw")  # Minimal padding, top-left anchor
-
-        # Content area
+        # Content area (center everything)
         content = tk.Frame(main_frame, bg="#fff")
-        content.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
+        content.pack(fill=tk.BOTH, expand=True)
 
-        # Load lotus images
+        # Select File button (small, top center)
+        self.sidebar_img = Image.open("sidebar.png").resize((40, 40), Image.LANCZOS)
+        self.sidebar_photo = ImageTk.PhotoImage(self.sidebar_img)
+        self.btn_select = tk.Button(
+            content, image=self.sidebar_photo, command=self.select_file,
+            bd=0, bg="#fff", activebackground="#fff", cursor="hand2",
+            width=40, height=40
+        )
+        self.btn_select.pack(pady=(20, 10))
+
+        # Lotus images and big live recording button (center)
         self.lotus_closed_img = Image.open("lotusclosed.png").resize((180, 180), Image.LANCZOS)
         self.lotus_closed_photo = ImageTk.PhotoImage(self.lotus_closed_img)
         self.lotus_open_img = Image.open("lotusopen.png").resize((180, 180), Image.LANCZOS)
         self.lotus_open_photo = ImageTk.PhotoImage(self.lotus_open_img)
 
-        # Big live recording button in the center
-        self.live_btn_frame = tk.Frame(content, bg="#fff")
-        self.live_btn_frame.pack(pady=(30, 10))
         self.btn_live = tk.Button(
-            self.live_btn_frame,
+            content,
             image=self.lotus_closed_photo,
             command=self.use_live_audio,
             bd=0,
             bg="#fff",
             activebackground="#fff"
         )
-        self.btn_live.pack()
+        self.btn_live.pack(pady=(10, 20))
 
-        # Transcription box with scrollbar
+        # Transcription box with scrollbar (centered below)
         text_frame = tk.Frame(content, bg="#fff")
         text_frame.pack(pady=10, padx=20, fill=tk.BOTH, expand=True)
 
