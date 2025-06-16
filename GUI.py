@@ -38,8 +38,8 @@ class SpeechRecognitionApp:
         header.pack(fill=tk.X, side=tk.TOP)
         header_label = tk.Label(
             header,
-            text="LOTUS Speech Recognition",
-            font=("Arial", 22, "bold"),
+            text="LOTUS",
+            font=("Segoe UI", 22, "bold"),  # Changed from Arial to Segoe UI
             fg="white",
             bg="#ffb6c1"
         )
@@ -85,7 +85,7 @@ class SpeechRecognitionApp:
 
         self.text_box = tk.Text(
             text_frame, width=60, height=12, wrap=tk.WORD,
-            font=("Arial", 12), bg="#ffe4ec", fg="#c71585", insertbackground="#c71585"
+            font=("Segoe UI", 13), bg="#ffe4ec", fg="#c71585", insertbackground="#c71585"
         )
         self.text_box.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
