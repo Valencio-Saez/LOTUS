@@ -11,6 +11,9 @@ import threading
 import sounddevice as sd
 from scipy.io.wavfile import write
 import numpy as np
+import librosa
+import parselmouth
+import re
 
 # Function to check for internet connection
 
@@ -22,6 +25,33 @@ def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
         return True
     except socket.error as ex:
         return False
+
+# Function to estimate pitch and classify gender
+
+
+def estimate_average_pitch(file_path):
+    try:
+        snd = parselmouth.Sound(file_path)
+        pitch = snd.to_pitch()
+        pitch_values = [
+            p for p in pitch.selected_array['frequency'] if 50 < p < 300]
+        if pitch_values:
+            return sum(pitch_values) / len(pitch_values)
+    except Exception as e:
+        print(f"Pitch estimation error: {e}")
+    return None
+
+
+def classify_gender(pitch):
+    if pitch:
+        if pitch < 155:
+            return "man"
+        elif pitch > 180:
+            return "woman"
+        else:
+            return "unknown"
+    return "unknown"
+
 
 # Speech Recognition Logic
 
@@ -93,6 +123,10 @@ class SpeechRecognitionApp:
 
         self.text_box.config(yscrollcommand=self.scrollbar.set)
 
+        # Tag colors
+        self.text_box.tag_config("man", foreground="skyblue")
+        self.text_box.tag_config("woman", foreground="yellow")
+
     def make_button_round(self, button):
         button.config(borderwidth=0)
         button.config(highlightthickness=0)
@@ -107,13 +141,11 @@ class SpeechRecognitionApp:
             volume_norm = np.linalg.norm(indata) * 10
             self.current_rms = volume_norm
 
-        # Initialize once
         if not hasattr(self, "audio_stream"):
             self.current_rms = 0
             self.audio_stream = sd.InputStream(callback=audio_callback)
             self.audio_stream.start()
 
-        # Normalize and cap scale
         scale = 1.0 + min(self.current_rms / 10.0, 1.0)
         x_center, y_center = 400, 250
         r = int(80 * scale)
@@ -135,36 +167,43 @@ class SpeechRecognitionApp:
         else:
             self.display_text("No file selected")
 
-    def display_text(self, content):
+    def display_text(self, content, tag=None, append=False):
         self.text_box.delete(1.0, tk.END)
-        words = content.split()
-        line = "Transcription complete:\n"
-        for word in words:
-            if len(line) + len(word) + 1 > 75:
-                self.text_box.insert(tk.END, line + '\n')
-                line = word
-            else:
-                if line:
-                    line += " " + word
-                else:
-                    line = word
-        if line:
-            self.text_box.insert(tk.END, line + '\n')
+
+        # Add tag info if known
+        if tag in ["man", "woman"]:
+            self.text_box.insert(tk.END, f"Detected: {tag}\n", tag)
+        else:
+            self.text_box.insert(tk.END, "Detected: unknown\n")
+
+        self.text_box.insert(tk.END, "Transcription complete:\n", None)
+
+        # Split into sentences using regex
+        sentences = re.split(r'(?<=[.!?]) +', content.strip())
+
+        # Alternate tags (man/woman), or keep same if tag is known
+        current_tag = tag or "man"
+        alt_tag = "woman" if current_tag == "man" else "man"
+
+        for i, sentence in enumerate(sentences):
+            line_tag = current_tag if i % 2 == 0 else alt_tag
+            self.text_box.insert(tk.END, sentence + '\n', line_tag)
 
     def read_wav(self, file_path):
         try:
-            # wav_file = SpeechRec.prepare_voice_file(file_path)
             if check_internet_connection():
                 text = SpeechRec().transcribe_audio_file(file_path, "output.txt")
             else:
-                # Initialize offline recognizer
                 self.offline_recognizer = OfflineSpeechRecognition(
-                    r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
+                    r"C:\\Users\\matth\\Downloads\\vosk-model-en-us-0.42-gigaspeech")
                 converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(
-                    wav_file)
+                    file_path)
                 text = self.offline_recognizer.transcribe_audio_file(
                     converted_path)
-            self.display_text(text)
+            pitch = estimate_average_pitch(file_path)
+            gender = classify_gender(pitch)
+            tag = gender if gender in ["man", "woman"] else None
+            self.display_text(text, tag)
         except Exception as e:
             self.display_text(f"Error processing WAV file: {e}")
 
@@ -178,7 +217,6 @@ class SpeechRecognitionApp:
 
     def use_live_audio(self):
         if hasattr(self, 'recording') and self.recording:
-            # Stop recording
             self.recording = False
             if hasattr(self, "audio_stream"):
                 self.audio_stream.stop()
@@ -186,17 +224,13 @@ class SpeechRecognitionApp:
                 del self.audio_stream
             self.canvas.itemconfig(self.btn_live_text, text="Live Recording")
         else:
-            # Start recording
             self.recording = True
             self.canvas.itemconfig(self.btn_live_text, text="Stop Recording")
-            # self.animate_button()
             threading.Thread(target=self.record_audio).start()
 
     def record_audio(self):
-
         self.display_text("Recording... Press 'Stop Recording' to finish.")
-        fs = 44100  # Sample rate
-        seconds = 0  # Duration is dynamic based on button press
+        fs = 44100
         audio_data = []
 
         def callback(indata, frames, time, status):
@@ -213,23 +247,24 @@ class SpeechRecognitionApp:
             self.display_text(f"Error during recording: {e}")
             return
 
-        # Save the recording
         audio_array = np.concatenate(audio_data, axis=0)
         write("live_recording.wav", fs, (audio_array * 32767).astype(np.int16))
-        self.display_text("Recording saved as 'live_recording.wav'.")
-        # Process the saved recording
+        self.display_text(
+            "Recording saved as 'live_recording.wav'.", append=True)
         try:
             if check_internet_connection():
                 text = SpeechRec().transcribe_audio_file("live_recording.wav", "output.txt")
             else:
-                # Initialize offline recognizer
                 self.offline_recognizer = OfflineSpeechRecognition(
-                    r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
+                    r"C:\\Users\\matth\\Downloads\\vosk-model-en-us-0.42-gigaspeech")
                 converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(
                     "live_recording.wav")
                 text = self.offline_recognizer.transcribe_audio_file(
                     converted_path)
-            self.display_text(text)
+            pitch = estimate_average_pitch("live_recording.wav")
+            gender = classify_gender(pitch)
+            tag = gender if gender in ["man", "woman"] else None
+            self.display_text(text, tag)
         except Exception as e:
             self.display_text(f"Error processing live recording: {e}")
 
@@ -238,7 +273,6 @@ class SpeechRecognitionApp:
 
 
 if __name__ == "__main__":
-    # Run the application
     root = tk.Tk()
     app = SpeechRecognitionApp(root)
     root.mainloop()
