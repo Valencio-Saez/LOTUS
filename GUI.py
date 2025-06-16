@@ -105,20 +105,9 @@ class SpeechRecognitionApp:
             self.display_text("No file selected")
 
     def display_text(self, content):
-        self.text_box.delete(1.0, tk.END)
-        words = content.split()
-        line = "Transcription complete:\n"
-        for word in words:
-            if len(line) + len(word) + 1 > 75:
-                self.text_box.insert(tk.END, line + '\n')
-                line = word
-            else:
-                if line:
-                    line += " " + word
-                else:
-                    line = word
-        if line:
-            self.text_box.insert(tk.END, line + '\n')
+        # Only append the transcription text, no extra status messages
+        self.text_box.insert(tk.END, content.strip() + '\n\n\n')
+        self.text_box.see(tk.END)
 
     def read_wav(self, file_path):
         try:
@@ -159,7 +148,7 @@ class SpeechRecognitionApp:
 
     def record_audio(self):
 
-        self.display_text("Recording... Press 'Stop Recording' to finish.")
+        # Removed status messages, only transcriptions will be shown
         fs = 44100  # Sample rate
         seconds = 0  # Duration is dynamic based on button press
         audio_data = []
@@ -181,7 +170,7 @@ class SpeechRecognitionApp:
         # Save the recording
         audio_array = np.concatenate(audio_data, axis=0)
         write("live_recording.wav", fs, (audio_array * 32767).astype(np.int16))
-        self.display_text("Recording saved as 'live_recording.wav'.")
+        # Removed: self.display_text("Recording saved as 'live_recording.wav'.")
         # Process the saved recording
         try:
             if check_internet_connection():
