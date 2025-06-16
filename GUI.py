@@ -31,52 +31,74 @@ class SpeechRecognitionApp:
         self.root = root
         self.root.title("Speech Recognition")
         self.root.geometry("900x600")
-        self.root.configure(bg="#f0f0f0")
+        self.root.configure(bg="#fff")  # White background
 
         # Header Frame
-        header = tk.Frame(root, bg="#283593", height=60)
+        header = tk.Frame(root, bg="#ffb6c1", height=60)
         header.pack(fill=tk.X, side=tk.TOP)
-        header_label = tk.Label(header, text="LOTUS Speech Recognition", font=("Arial", 22, "bold"), fg="white", bg="#283593")
+        header_label = tk.Label(
+            header,
+            text="LOTUS Speech Recognition",
+            font=("Arial", 22, "bold"),
+            fg="white",
+            bg="#ffb6c1"
+        )
         header_label.pack(pady=10)
 
         # Main Frame
-        main_frame = tk.Frame(root, bg="#f0f0f0")
+        main_frame = tk.Frame(root, bg="#fff")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Sidebar for buttons
-        sidebar = tk.Frame(main_frame, bg="#3949ab", width=200)
+        sidebar = tk.Frame(main_frame, bg="#ffe4ec", width=200)
         sidebar.pack(fill=tk.Y, side=tk.LEFT)
         sidebar.pack_propagate(False)
 
         self.btn_select = tk.Button(
-            sidebar, text="Select File", command=self.select_file, width=18, height=2, bg="#5c6bc0", fg="white", font=("Arial", 12, "bold"))
+            sidebar, text="Select File", command=self.select_file,
+            width=18, height=2, bg="#ffb6c1", fg="white",
+            font=("Arial", 12, "bold"), activebackground="#ff69b4", activeforeground="white"
+        )
         self.btn_select.pack(pady=(40, 20))
 
-        self.btn_live = tk.Button(
-            sidebar, text="Live Recording", command=self.use_live_audio, width=18, height=2, bg="#5c6bc0", fg="white", font=("Arial", 12, "bold"))
-        self.btn_live.pack(pady=20)
-
         self.btn_quit = tk.Button(
-            sidebar, text="Quit", command=self.quit_app, width=18, height=2, bg="#c62828", fg="white", font=("Arial", 12, "bold"))
+            sidebar, text="Quit", command=self.quit_app,
+            width=18, height=2, bg="#ff69b4", fg="white",
+            font=("Arial", 12, "bold"), activebackground="#ffb6c1", activeforeground="white"
+        )
         self.btn_quit.pack(pady=20)
 
         # Content area
-        content = tk.Frame(main_frame, bg="#f0f0f0")
+        content = tk.Frame(main_frame, bg="#fff")
         content.pack(fill=tk.BOTH, expand=True, side=tk.LEFT)
 
-        # Logo
-        self.image_path = "logo.png"
-        self.image = Image.open(self.image_path)
-        self.image = self.image.resize((250, 200), Image.LANCZOS)
-        self.photo = ImageTk.PhotoImage(self.image)
-        logo_label = tk.Label(content, image=self.photo, bg="#f0f0f0")
-        logo_label.pack(pady=(30, 10))
+        # Load lotus images
+        self.lotus_closed_img = Image.open("lotusclosed.png").resize((180, 180), Image.LANCZOS)
+        self.lotus_closed_photo = ImageTk.PhotoImage(self.lotus_closed_img)
+        self.lotus_open_img = Image.open("lotusopen.png").resize((180, 180), Image.LANCZOS)
+        self.lotus_open_photo = ImageTk.PhotoImage(self.lotus_open_img)
+
+        # Big live recording button in the center
+        self.live_btn_frame = tk.Frame(content, bg="#fff")
+        self.live_btn_frame.pack(pady=(30, 10))
+        self.btn_live = tk.Button(
+            self.live_btn_frame,
+            image=self.lotus_closed_photo,
+            command=self.use_live_audio,
+            bd=0,
+            bg="#fff",
+            activebackground="#fff"
+        )
+        self.btn_live.pack()
 
         # Transcription box with scrollbar
-        text_frame = tk.Frame(content, bg="#f0f0f0")
+        text_frame = tk.Frame(content, bg="#fff")
         text_frame.pack(pady=10, padx=20, fill=tk.BOTH, expand=True)
 
-        self.text_box = tk.Text(text_frame, width=60, height=12, wrap=tk.WORD, font=("Arial", 12))
+        self.text_box = tk.Text(
+            text_frame, width=60, height=12, wrap=tk.WORD,
+            font=("Arial", 12), bg="#ffe4ec", fg="#c71585", insertbackground="#c71585"
+        )
         self.text_box.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.scrollbar = tk.Scrollbar(text_frame, orient=tk.VERTICAL, command=self.text_box.yview)
@@ -140,11 +162,11 @@ class SpeechRecognitionApp:
         if hasattr(self, 'recording') and self.recording:
             # Stop recording
             self.recording = False
-            self.btn_live.config(text="Live Recording")
+            self.btn_live.config(image=self.lotus_closed_photo)
         else:
             # Start recording
             self.recording = True
-            self.btn_live.config(text="Stop Recording")
+            self.btn_live.config(image=self.lotus_open_photo)
             threading.Thread(target=self.record_audio).start()
 
     def record_audio(self):
