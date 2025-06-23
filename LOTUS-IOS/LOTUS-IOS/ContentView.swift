@@ -4,45 +4,38 @@ import Speech
 
 struct ContentView: View {
     private let audioEngine = AVAudioEngine()
-    
     @State private var isRecording = false
     @State private var fullTranscription = ""
-    @State private var lastAppendedTranscription = ""
-    @State private var instruction = "Tap the lotus to start speaking"
+    @State private var lastPartial = ""
+    @State private var instruction = "Tap the lotus to start speaking!"
     @State private var recognitionTask: SFSpeechRecognitionTask?
     @State private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     @State private var micLevel: CGFloat = 0
-    @State private var partialText = ""
-    
+    @State private var silenceTimer: Timer?
     private let silenceDelay: TimeInterval = 1.5
-    @State private var silenceTimer: Timer? = nil
     
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
-            
+
             ScrollViewReader { proxy in
-                ScrollView(.vertical, showsIndicators: true) {
+                ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         ForEach(fullTranscription.components(separatedBy: "\n"), id: \.self) { line in
                             Text(line)
-                                .foregroundColor(.black)
-                                .font(.body)
-                                .multilineTextAlignment(.leading)
+                                .foregroundColor(.black) // <--- Text color fixed here
                         }
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .id("Bottom")
+                    .id("bottom")
                 }
                 .frame(height: 250)
                 .background(Color(white: 0.95))
                 .cornerRadius(12)
                 .padding(.horizontal)
-                .onChange(of: fullTranscription) { _ in
-                    withAnimation {
-                        proxy.scrollTo("Bottom", anchor: .bottom)
-                    }
+                .onChange(of: fullTranscription) {
+                    withAnimation { proxy.scrollTo("bottom", anchor: .bottom) }
                 }
             }
 
@@ -64,36 +57,37 @@ struct ContentView: View {
                 }
                 .accessibilityLabel(isRecording ? "Stop recording" : "Start recording")
 
-            Text(instruction)
+            Text(instruction) 
                 .padding()
-                .multilineTextAlignment(.center)
                 .foregroundColor(.gray)
                 .font(.title3)
-            
+                .multilineTextAlignment(.center)
+
             Spacer().frame(height: 60)
         }
         .background(Color.white)
         .edgesIgnoringSafeArea(.all)
     }
+    
 
+    
     private func requestPermissionsAndStart() {
         SFSpeechRecognizer.requestAuthorization { authStatus in
             guard authStatus == .authorized else { return }
             AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                if granted {
-                    DispatchQueue.main.async { startRecording() }
-                }
+                if granted { DispatchQueue.main.async { startRecording() } }
             }
         }
     }
-
+    
+    
     private func startRecording() {
         stopRecording()
 
-        let audioSession = AVAudioSession.sharedInstance()
         do {
-            try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
-            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             print("Audio session error: \(error.localizedDescription)")
             return
@@ -102,60 +96,47 @@ struct ContentView: View {
         let recognizer = SFSpeechRecognizer(locale: Locale.current)
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let request = recognitionRequest else { return }
-        
         request.shouldReportPartialResults = true
         request.taskHint = .dictation
-        request.requiresOnDeviceRecognition = false
 
         let inputNode = audioEngine.inputNode
         let format = inputNode.outputFormat(forBus: 0)
         inputNode.removeTap(onBus: 0)
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
             request.append(buffer)
-            updateMicLevel(buffer: buffer)
+            updateMicLevel(buffer)
         }
 
-        do {
-            try audioEngine.start()
-        } catch {
+        do { try audioEngine.start() } catch {
             print("Audio engine error: \(error.localizedDescription)")
             return
         }
-
         instruction = "Listening..."
         isRecording = true
         fullTranscription = ""
-        lastAppendedTranscription = ""
-        partialText = ""
+        lastPartial = ""
 
         recognitionTask = recognizer?.recognitionTask(with: request) { result, error in
             if let result = result {
-                let transcript = result.bestTranscription.formattedString
+                let current = result.bestTranscription.formattedString
                 DispatchQueue.main.async {
-                    partialText = transcript
-                    
                     silenceTimer?.invalidate()
                     silenceTimer = Timer.scheduledTimer(withTimeInterval: silenceDelay, repeats: false) { _ in
                         DispatchQueue.main.async {
-                            let newText = partialText.replacingOccurrences(of: lastAppendedTranscription, with: "").trimmingCharacters(in: .whitespacesAndNewlines)
-                            if !newText.isEmpty {
-                                fullTranscription += (fullTranscription.isEmpty ? "" : "\n") + newText
-                                lastAppendedTranscription = partialText
+                            let newSegment = current.replacingOccurrences(of: lastPartial, with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !newSegment.isEmpty {
+                                fullTranscription += (fullTranscription.isEmpty ? "" : "\n") + newSegment
+                                lastPartial = current
                             }
-                            partialText = ""
                         }
                     }
                 }
             }
-
-            if error != nil {
-                stopRecording()
-            }
+            if error != nil { stopRecording() }
         }
-
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
-
+    
     private func stopRecording() {
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
@@ -172,15 +153,11 @@ struct ContentView: View {
 
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
-
-    private func updateMicLevel(buffer: AVAudioPCMBuffer) {
+    
+    private func updateMicLevel(_ buffer: AVAudioPCMBuffer) {
         guard let channelData = buffer.floatChannelData?[0] else { return }
         let frameLength = Int(buffer.frameLength)
-        let channelDataArray = Array(UnsafeBufferPointer(start: channelData, count: frameLength))
-        let sumSquares = channelDataArray.map { $0 * $0 }.reduce(0, +)
-        let meanSquare = sumSquares / Float(frameLength)
-        let rms = sqrt(meanSquare)
+        let rms = sqrt((0..<frameLength).map { channelData[$0] * channelData[$0] }.reduce(0, +) / Float(frameLength))
         micLevel = CGFloat(min(max(rms * 50, 0), 1))
     }
 }
-
