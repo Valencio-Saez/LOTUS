@@ -22,7 +22,7 @@ from pydub import AudioSegment
 
 pipeline = Pipeline.from_pretrained(
     "pyannote/speaker-diarization",
-    use_auth_token="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"
+    use_auth_token="temp_key_here"
 )
 
 
