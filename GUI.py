@@ -11,6 +11,7 @@ import threading
 import sounddevice as sd
 from scipy.io.wavfile import write
 import numpy as np
+from tkinter import messagebox
 
 # Function to check for internet connection
 def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
@@ -145,11 +146,20 @@ class SpeechRecognitionApp:
             if check_internet_connection():
                 text = SpeechRec().transcribe_audio_file(file_path, "output.txt")
             else:
+                # Check if VOSK model exists in the repo
+                vosk_model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vosk-model-en-us-0.42-gigaspeech")
+                if not os.path.exists(vosk_model_path):
+                    messagebox.showerror("VOSK Model Missing", "Need to download VOSK model")
+                    return
                 # Initialize offline recognizer
-                self.offline_recognizer = OfflineSpeechRecognition(
-                    r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
-                converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(file_path)
-                text = self.offline_recognizer.transcribe_audio_file(converted_path)
+                try:
+                    self.offline_recognizer = OfflineSpeechRecognition(vosk_model_path)
+                    converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(file_path)
+                    text = self.offline_recognizer.transcribe_audio_file(converted_path)
+                except Exception as e:
+                    messagebox.showerror("VOSK Error", f"Error initializing or using VOSK model: {str(e)}")
+                    self.display_text(f"Error processing audio file: {str(e)}")
+                    return
             
             if text and text.strip():
                 self.display_text(text)
@@ -204,11 +214,20 @@ class SpeechRecognitionApp:
             if check_internet_connection():
                 text = SpeechRec().transcribe_audio_file("live_recording.wav", "output.txt")
             else:
+                # Check if VOSK model exists in the repo
+                vosk_model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vosk-model-en-us-0.42-gigaspeech")
+                if not os.path.exists(vosk_model_path):
+                    messagebox.showerror("VOSK Model Missing", "Need to download VOSK model")
+                    return
                 # Initialize offline recognizer
-                self.offline_recognizer = OfflineSpeechRecognition(
-                    r"C:\Users\matth\Downloads\vosk-model-en-us-0.42-gigaspeech")
-                converted_path = self.offline_recognizer.convert_to_wav_mono_pcm("live_recording.wav")
-                text = self.offline_recognizer.transcribe_audio_file(converted_path)
+                try:
+                    self.offline_recognizer = OfflineSpeechRecognition(vosk_model_path)
+                    converted_path = self.offline_recognizer.convert_to_wav_mono_pcm("live_recording.wav")
+                    text = self.offline_recognizer.transcribe_audio_file(converted_path)
+                except Exception as e:
+                    messagebox.showerror("VOSK Error", f"Error initializing or using VOSK model: {str(e)}")
+                    self.display_text(f"Error processing live recording: {str(e)}")
+                    return
             
             if text and text.strip():
                 self.display_text(text)
