@@ -14,8 +14,16 @@ import numpy as np
 import librosa
 import parselmouth
 import re
+import wave
 
-# Function to check for internet connection
+from vosk import Model, KaldiRecognizer
+from pyannote.audio import Pipeline
+from pydub import AudioSegment
+
+pipeline = Pipeline.from_pretrained(
+    "pyannote/speaker-diarization",
+    use_auth_token="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"
+)
 
 
 def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
@@ -23,37 +31,8 @@ def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
         socket.setdefaulttimeout(timeout)
         socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
         return True
-    except socket.error as ex:
+    except socket.error:
         return False
-
-# Function to estimate pitch and classify gender
-
-
-def estimate_average_pitch(file_path):
-    try:
-        snd = parselmouth.Sound(file_path)
-        pitch = snd.to_pitch()
-        pitch_values = [
-            p for p in pitch.selected_array['frequency'] if 50 < p < 300]
-        if pitch_values:
-            return sum(pitch_values) / len(pitch_values)
-    except Exception as e:
-        print(f"Pitch estimation error: {e}")
-    return None
-
-
-def classify_gender(pitch):
-    if pitch:
-        if pitch < 155:
-            return "man"
-        elif pitch > 180:
-            return "woman"
-        else:
-            return "unknown"
-    return "unknown"
-
-
-# Speech Recognition Logic
 
 
 class SpeechRecognitionApp:
@@ -62,8 +41,8 @@ class SpeechRecognitionApp:
         self.root.title("Speech Recognition")
         self.root.geometry("800x600")
         self.root.configure(bg="#212121")
+        self.speaker_colors = {}  # <- FIXED: Declare once here
 
-        # Create menu bar
         menu_bar = tk.Menu(self.root)
         file_menu = tk.Menu(menu_bar, tearoff=0, bg="#2a2a2a", fg="white")
         file_menu.add_command(label="Select File", command=self.select_file)
@@ -72,11 +51,9 @@ class SpeechRecognitionApp:
         menu_bar.add_cascade(label="☰", menu=file_menu)
         self.root.config(menu=menu_bar)
 
-        # Canvas to simulate a round button
         self.canvas = tk.Canvas(root, bg="#212121", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True)
 
-        # Draw round button (centered oval)
         x_center, y_center, r = 400, 250, 120
         self.btn_live_oval = self.canvas.create_oval(
             x_center - r, y_center - r, x_center + r, y_center + r,
@@ -87,74 +64,37 @@ class SpeechRecognitionApp:
             fill="white", font=("Helvetica", 12, "bold")
         )
 
-        # Hover effect functions
         def on_enter(event):
-            self.canvas.itemconfig(
-                self.btn_live_oval, fill="#2a2a2a")  # lighter shade
+            self.canvas.itemconfig(self.btn_live_oval, fill="#2a2a2a")
 
         def on_leave(event):
-            self.canvas.itemconfig(
-                self.btn_live_oval, fill="#171717")  # original color
+            self.canvas.itemconfig(self.btn_live_oval, fill="#171717")
 
-        # Bind hover to both oval and text
         self.canvas.tag_bind(self.btn_live_oval, "<Enter>", on_enter)
         self.canvas.tag_bind(self.btn_live_oval, "<Leave>", on_leave)
         self.canvas.tag_bind(self.btn_live_text, "<Enter>", on_enter)
         self.canvas.tag_bind(self.btn_live_text, "<Leave>", on_leave)
-
-        # Bind click events to both oval and text
         self.canvas.tag_bind(self.btn_live_oval, "<Button-1>",
                              lambda e: self.use_live_audio())
         self.canvas.tag_bind(self.btn_live_text, "<Button-1>",
                              lambda e: self.use_live_audio())
 
-        # Frame to hold text box and scrollbar together
         text_frame = tk.Frame(root, bg="#212121")
         text_frame.place(relx=0.5, rely=0.90, anchor="center")
 
-        # Text box
         self.text_box = tk.Text(text_frame, width=90, height=7, bg="#1e1e1e",
                                 fg="white", insertbackground='white', wrap="word", bd=0)
         self.text_box.pack(side=tk.LEFT, fill=tk.BOTH)
 
-        # Scrollbar
         self.scrollbar = tk.Scrollbar(text_frame, command=self.text_box.yview)
         self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.text_box.config(yscrollcommand=self.scrollbar.set)
 
-        # Tag colors
-        self.text_box.tag_config("man", foreground="skyblue")
-        self.text_box.tag_config("woman", foreground="yellow")
-
-    def make_button_round(self, button):
-        button.config(borderwidth=0)
-        button.config(highlightthickness=0)
-        button.config(font=("Helvetica", 30, "bold"))
-        button.config(wraplength=120)
-
-    def animate_button(self):
-        if not hasattr(self, "recording") or not self.recording:
-            return
-
-        def audio_callback(indata, frames, time, status):
-            volume_norm = np.linalg.norm(indata) * 10
-            self.current_rms = volume_norm
-
-        if not hasattr(self, "audio_stream"):
-            self.current_rms = 0
-            self.audio_stream = sd.InputStream(callback=audio_callback)
-            self.audio_stream.start()
-
-        scale = 1.0 + min(self.current_rms / 10.0, 1.0)
-        x_center, y_center = 400, 250
-        r = int(80 * scale)
-        self.canvas.coords(self.btn_live_oval,
-                           x_center - r, y_center - r,
-                           x_center + r, y_center + r)
-        self.canvas.coords(self.btn_live_text, x_center, y_center)
-
-        self.root.after(100, self.animate_button)
+    def display_text(self, content, tag=None, append=False):
+        if not append:
+            self.text_box.delete(1.0, tk.END)
+        self.text_box.insert(tk.END, content + "\n", tag)
 
     def select_file(self, hidden=False):
         initial_dir = os.path.dirname(os.path.abspath(__file__))
@@ -167,45 +107,50 @@ class SpeechRecognitionApp:
         else:
             self.display_text("No file selected")
 
-    def display_text(self, content, tag=None, append=False):
-        self.text_box.delete(1.0, tk.END)
-
-        # Add tag info if known
-        if tag in ["man", "woman"]:
-            self.text_box.insert(tk.END, f"Detected: {tag}\n", tag)
-        else:
-            self.text_box.insert(tk.END, "Detected: unknown\n")
-
-        self.text_box.insert(tk.END, "Transcription complete:\n", None)
-
-        # Split into sentences using regex
-        sentences = re.split(r'(?<=[.!?]) +', content.strip())
-
-        # Alternate tags (man/woman), or keep same if tag is known
-        current_tag = tag or "man"
-        alt_tag = "woman" if current_tag == "man" else "man"
-
-        for i, sentence in enumerate(sentences):
-            line_tag = current_tag if i % 2 == 0 else alt_tag
-            self.text_box.insert(tk.END, sentence + '\n', line_tag)
-
     def read_wav(self, file_path):
         try:
-            if check_internet_connection():
-                text = SpeechRec().transcribe_audio_file(file_path, "output.txt")
-            else:
-                self.offline_recognizer = OfflineSpeechRecognition(
-                    r"C:\\Users\\matth\\Downloads\\vosk-model-en-us-0.42-gigaspeech")
-                converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(
-                    file_path)
-                text = self.offline_recognizer.transcribe_audio_file(
-                    converted_path)
-            pitch = estimate_average_pitch(file_path)
-            gender = classify_gender(pitch)
-            tag = gender if gender in ["man", "woman"] else None
-            self.display_text(text, tag)
+            diarization = pipeline(file_path)
+            self.text_box.delete(1.0, tk.END)
+            self.text_box.insert(tk.END, "Detected Speakers:\n\n")
+            self.speaker_colors = {}
+            color_palette = ["skyblue", "lightgreen",
+                             "salmon", "violet", "orange", "lightgray"]
+            color_index = 0
+
+            for turn, _, speaker in diarization.itertracks(yield_label=True):
+                start = turn.start
+                end = turn.end
+
+                audio = AudioSegment.from_wav(file_path)
+                segment = audio[start * 1000:end * 1000]
+                segment_path = "temp_segment.wav"
+                segment.export(segment_path, format="wav")
+
+                if check_internet_connection():
+                    text = SpeechRec().transcribe_audio_file(segment_path, "output.txt")
+                else:
+                    self.offline_recognizer = OfflineSpeechRecognition(
+                        r"C:\\Users\\matth\\Downloads\\vosk-model-en-us-0.42-gigaspeech")
+                    converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(
+                        segment_path)
+                    text = self.offline_recognizer.transcribe_audio_file(
+                        converted_path)
+
+                if speaker not in self.speaker_colors:
+                    tag = f"speaker_{len(self.speaker_colors)}"
+                    self.speaker_colors[speaker] = tag
+                    self.text_box.tag_config(
+                        tag, foreground=color_palette[color_index % len(color_palette)])
+                    color_index += 1
+
+                tag = self.speaker_colors[speaker]
+                self.text_box.insert(tk.END, f"[{speaker}] ", tag)
+                self.text_box.insert(tk.END, text.strip() + "\n", tag)
+
+            self.text_box.insert(tk.END, "\nTranscription complete.")
         except Exception as e:
-            self.display_text(f"Error processing WAV file: {e}")
+            self.display_text(
+                f"Error processing WAV file with diarization: {e}")
 
     def read_text(self, file_path):
         try:
@@ -249,22 +194,49 @@ class SpeechRecognitionApp:
 
         audio_array = np.concatenate(audio_data, axis=0)
         write("live_recording.wav", fs, (audio_array * 32767).astype(np.int16))
-        self.display_text(
-            "Recording saved as 'live_recording.wav'.", append=True)
+        self.display_text("Recording saved. Processing...", append=True)
+
         try:
-            if check_internet_connection():
-                text = SpeechRec().transcribe_audio_file("live_recording.wav", "output.txt")
-            else:
-                self.offline_recognizer = OfflineSpeechRecognition(
-                    r"C:\\Users\\matth\\Downloads\\vosk-model-en-us-0.42-gigaspeech")
-                converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(
-                    "live_recording.wav")
-                text = self.offline_recognizer.transcribe_audio_file(
-                    converted_path)
-            pitch = estimate_average_pitch("live_recording.wav")
-            gender = classify_gender(pitch)
-            tag = gender if gender in ["man", "woman"] else None
-            self.display_text(text, tag)
+            diarization = pipeline("live_recording.wav")
+            self.text_box.delete(1.0, tk.END)
+            self.text_box.insert(tk.END, "Detected Speakers:\n\n")
+            self.speaker_colors = {}
+            color_palette = ["skyblue", "lightgreen",
+                             "salmon", "violet", "orange", "lightgray"]
+            color_index = 0
+
+            audio = AudioSegment.from_wav("live_recording.wav")
+
+            for turn, _, speaker in diarization.itertracks(yield_label=True):
+                start = turn.start
+                end = turn.end
+
+                segment = audio[start * 1000:end * 1000]
+                segment_path = "temp_segment.wav"
+                segment.export(segment_path, format="wav")
+
+                if check_internet_connection():
+                    text = SpeechRec().transcribe_audio_file(segment_path, "output.txt")
+                else:
+                    self.offline_recognizer = OfflineSpeechRecognition(
+                        r"C:\\Users\\matth\\Downloads\\vosk-model-en-us-0.42-gigaspeech")
+                    converted_path = self.offline_recognizer.convert_to_wav_mono_pcm(
+                        segment_path)
+                    text = self.offline_recognizer.transcribe_audio_file(
+                        converted_path)
+
+                if speaker not in self.speaker_colors:
+                    tag = f"speaker_{len(self.speaker_colors)}"
+                    self.speaker_colors[speaker] = tag
+                    self.text_box.tag_config(
+                        tag, foreground=color_palette[color_index % len(color_palette)])
+                    color_index += 1
+
+                tag = self.speaker_colors[speaker]
+                self.text_box.insert(tk.END, f"[{speaker}] ", tag)
+                self.text_box.insert(tk.END, text.strip() + "\n", tag)
+
+            self.text_box.insert(tk.END, "\nTranscription complete.")
         except Exception as e:
             self.display_text(f"Error processing live recording: {e}")
 
