@@ -15,6 +15,7 @@ import librosa
 import parselmouth
 import re
 import wave
+from dotenv import load_dotenv
 
 from vosk import Model, KaldiRecognizer
 from pyannote.audio import Pipeline
@@ -22,7 +23,7 @@ from pydub import AudioSegment
 
 pipeline = Pipeline.from_pretrained(
     "pyannote/speaker-diarization",
-    use_auth_token="temp_key_here"
+    use_auth_token=os.getenv("HUGGINGFACE_TOKEN")
 )
 
 
